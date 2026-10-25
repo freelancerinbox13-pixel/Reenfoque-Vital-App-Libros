@@ -4,14 +4,10 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>Lector Mini App - Telegram</title>
-    <!-- SDK de Telegram WebApp -->
     <script src="https://telegram.org/js/telegram-web-app.js"></script>
-    <!-- ePub.js para archivos EPUB -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.1.5/jszip.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/epubjs/dist/epub.min.js"></script>
-    <!-- PDF.js para archivos PDF -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.16.105/pdf.min.js"></script>
-    <!-- Supabase JS Client -->
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <style>
         :root {
@@ -67,7 +63,6 @@
         .reader-toolbar { display: flex; justify-content: space-between; align-items: center; padding: 10px 16px; background: var(--card-bg); font-size: 13px; z-index: 10; }
         .nota-item { background: var(--card-bg); padding: 10px; border-radius: 6px; margin-bottom: 8px; font-size: 13px; border-left: 4px solid var(--accent-color); }
 
-        /* Estilo para el menú flotante de selección */
         #menu-flotante {
             display: none;
             position: absolute;
@@ -101,7 +96,6 @@
 </head>
 <body>
 
-    <!-- Menú flotante interactivo -->
     <div id="menu-flotante">
         <button class="btn-amarillo" onclick="menuRemarcar()">Remarcar</button>
         <button onclick="menuTraducir()">Traducir</button>
@@ -117,7 +111,6 @@
     </header>
 
     <main>
-        <!-- SECCIÓN 1: BIBLIOTECA -->
         <div id="seccion-biblioteca" class="seccion activa">
             <h2 style="margin-bottom: 16px;">Tus Libros</h2>
             <div id="lista-libros" class="grid-libros">
@@ -125,7 +118,6 @@
             </div>
         </div>
 
-        <!-- SECCIÓN 2: LECTOR -->
         <div id="seccion-lector" class="seccion">
             <div style="display: flex; gap: 8px; margin-bottom: 8px; flex-wrap: wrap; align-items: center;">
                 <select id="select-modo" class="select-modo" onchange="cambiarModoDesplegable(this.value)">
@@ -147,7 +139,6 @@
             </div>
         </div>
 
-        <!-- SECCIÓN 3: NOTAS Y TRADUCCIONES -->
         <div id="seccion-notas" class="seccion">
             <h2 style="margin-bottom: 16px;">Notas y Traducciones</h2>
             <div id="lista-notas">
@@ -157,39 +148,51 @@
     </main>
 
     <script>
+        // ---------- Telegram ----------
         const tg = window.Telegram.WebApp;
         tg.expand();
+        tg.ready();
 
+        const tgUser = tg.initDataUnsafe?.user;
+        const tgUserId = tgUser?.id ?? null;
+        const tgHash = tg.initData || '';
+
+        // ---------- Supabase ----------
         const SUPABASE_URL = 'https://augjyfnnzserfdoekkrp.supabase.co';
         const SUPABASE_ANON_KEY = 'sb_publishable_ed7WzU7SyteyxrAk5qE44w_N2vslpMU';
         const supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
+        // ---------- Estado ----------
         let book = null;
         let rendition = null;
-        let notasGuardadas = JSON.parse(localStorage.getItem('reader_notes') || '[]');
         let zoomActivo = false;
 
         let pdfDoc = null;
         let pageNum = 1;
         let formatoActual = '';
         let urlActualGlobal = '';
+        let tituloLibroActual = '';
         let textoSeleccionadoActual = '';
         let epubRangeActual = null;
 
+        // ---------- Navegación ----------
         function cambiarSeccion(seccion) {
             document.querySelectorAll('.seccion').forEach(s => s.classList.remove('activa'));
             document.getElementById(`seccion-${seccion}`).classList.add('activa');
-            document.getElementById('titulo-app').innerText = seccion === 'biblioteca' ? 'Biblioteca' : seccion === 'lector' ? 'Lector' : 'Notas y Traducciones';
+            document.getElementById('titulo-app').innerText =
+                seccion === 'biblioteca' ? 'Biblioteca' :
+                seccion === 'lector' ? 'Lector' : 'Notas y Traducciones';
             if (seccion === 'notas') renderizarNotas();
             ocultarMenuFlotante();
         }
 
+        // ---------- Biblioteca ----------
         async function cargarBiblioteca() {
             const contenedor = document.getElementById('lista-libros');
             contenedor.innerHTML = '<p>Conectando con Supabase...</p>';
 
             const { data, error } = await supabaseClient.from('libros').select('*');
-            
+
             if (error) {
                 contenedor.innerHTML = `<p style="color: red;">Error: ${error.message}</p>`;
                 return;
@@ -208,17 +211,18 @@
                     <div style="background:#ddd; height:120px; border-radius:4px; margin-bottom:8px; display:flex; align-items:center; justify-content:center;">📖</div>
                     <h3>${libro.titulo || 'Sin título'}</h3>
                 `;
-                card.onclick = () => abrirLibro(libro.url_archivo);
+                card.onclick = () => abrirLibro(libro.url_archivo, libro.titulo || 'Sin título');
                 contenedor.appendChild(card);
             });
         }
 
-        function abrirLibro(url) {
+        function abrirLibro(url, titulo) {
             if (!url) {
                 alert("URL de archivo no válida.");
                 return;
             }
             urlActualGlobal = url;
+            tituloLibroActual = titulo || '';
             cambiarSeccion('lector');
             const viewer = document.getElementById('viewer');
             viewer.innerHTML = '';
@@ -233,7 +237,7 @@
             }
         }
 
-        function cargarEpub(url) {
+        async function cargarEpub(url) {
             book = ePub(url);
             rendition = book.renderTo("viewer", { width: "100%", height: "100%" });
 
@@ -248,17 +252,22 @@
                 }
             });
 
-            // Evento nativo de selección en ePub.js
             rendition.on("selected", (cfiRange, contents) => {
                 epubRangeActual = cfiRange;
                 textoSeleccionadoActual = contents.window.getSelection().toString().trim();
-                
+
                 if (textoSeleccionadoActual.length > 0) {
                     try {
                         const selection = contents.window.getSelection();
                         const range = selection.getRangeAt(0);
                         const rect = range.getBoundingClientRect();
-                        mostrarMenuFlotante(rect.left + 20, rect.top - 45);
+                        const frameRect = contents.window.frameElement
+                            ? contents.window.frameElement.getBoundingClientRect()
+                            : { left: 0, top: 0 };
+                        mostrarMenuFlotante(
+                            frameRect.left + rect.left + 20,
+                            frameRect.top + rect.top - 45
+                        );
                     } catch (e) {
                         mostrarMenuFlotante(100, 100);
                     }
@@ -266,6 +275,30 @@
             });
 
             book.locations.generate(1024);
+
+            // Re-aplicar highlights guardados
+            if (tgUserId) {
+                const { data: anots } = await supabaseClient
+                    .from('reader_annotations')
+                    .select('*')
+                    .eq('user_id', tgUserId)
+                    .eq('book_id', url)
+                    .eq('annotation_type', 'Resaltado')
+                    .is('deleted_at', null);
+
+                (anots || []).forEach(a => {
+                    if (a.anchor && a.anchor.type === 'epub-cfi') {
+                        try {
+                            rendition.annotations.highlight(
+                                a.anchor.cfi, {}, null, "highlight",
+                                { fill: a.color || '#ffeb3b', "fill-opacity": "0.4" }
+                            );
+                        } catch (err) {
+                            console.warn('No se pudo re-aplicar highlight:', err);
+                        }
+                    }
+                });
+            }
         }
 
         function cargarPdf(url) {
@@ -305,7 +338,7 @@
             });
         }
 
-        // Detector de selección general para PDF y textos web
+        // ---------- Selección ----------
         document.addEventListener('mouseup', procesarSeleccionGeneral);
         document.addEventListener('touchend', procesarSeleccionGeneral);
 
@@ -315,6 +348,7 @@
                 const texto = sel.toString().trim();
                 if (texto.length > 0) {
                     textoSeleccionadoActual = texto;
+                    epubRangeActual = null; // PDF no tiene CFI
                     try {
                         const range = sel.getRangeAt(0);
                         const rect = range.getBoundingClientRect();
@@ -334,48 +368,115 @@
         }
 
         function ocultarMenuFlotante() {
-            const menu = document.getElementById('menu-flotante');
-            menu.style.display = 'none';
+            document.getElementById('menu-flotante').style.display = 'none';
         }
 
-        // Acciones del menú flotante
-        function menuRemarcar() {
+        // ---------- Guardado en Supabase ----------
+        async function guardarAnotacion({ tipo, texto, original, anchor, color }) {
+            if (!tgUserId) {
+                alert('Usuario de Telegram no disponible.');
+                return null;
+            }
+            const payload = {
+                user_id: tgUserId,
+                telegram_hash: tgHash ? tgHash.slice(0, 64) : null,
+                book_id: urlActualGlobal,
+                book_title: tituloLibroActual,
+                annotation_type: tipo,
+                text_content: texto,
+                original_text: original || '',
+                anchor: anchor || null,
+                color: color || null,
+                client_id: (crypto.randomUUID ? crypto.randomUUID() : String(Date.now()))
+            };
+
+            const { data, error } = await supabaseClient
+                .from('reader_annotations')
+                .insert(payload)
+                .select()
+                .single();
+
+            if (error) {
+                console.error('Error guardando anotación:', error);
+                alert('No se pudo guardar: ' + error.message);
+                return null;
+            }
+            return data;
+        }
+
+        // ---------- Acciones del menú ----------
+        async function menuRemarcar() {
             if (!textoSeleccionadoActual) {
                 alert("Ningún texto seleccionado.");
                 return;
             }
+
+            const anchor = (formatoActual === 'epub' && epubRangeActual)
+                ? { type: 'epub-cfi', cfi: epubRangeActual }
+                : null;
+
             if (formatoActual === 'epub' && rendition && epubRangeActual) {
-                // Resalta en amarillo directamente en ePub.js
-                rendition.annotations.highlight(epubRangeActual, {}, (e) => {}, "highlight", { fill: "yellow", "fill-opacity": "0.4" });
+                rendition.annotations.highlight(
+                    epubRangeActual, {}, null, "highlight",
+                    { fill: "#ffeb3b", "fill-opacity": "0.4" }
+                );
             }
-            notasGuardadas.push({ tipo: 'Remarcado', texto: textoSeleccionadoActual, fecha: new Date().toLocaleDateString() });
-            localStorage.setItem('reader_notes', JSON.stringify(notasGuardadas));
+
+            await guardarAnotacion({
+                tipo: 'Resaltado',
+                texto: textoSeleccionadoActual,
+                original: textoSeleccionadoActual,
+                anchor,
+                color: '#ffeb3b'
+            });
+
             ocultarMenuFlotante();
-            alert("Texto remarcado de amarillo y guardado.");
         }
 
-        function menuTraducir() {
+        async function menuTraducir() {
             if (!textoSeleccionadoActual) {
                 alert("Ningún texto seleccionado.");
                 return;
             }
-            notasGuardadas.push({ tipo: 'Traducción', texto: `[Traducido]: ${textoSeleccionadoActual}`, fecha: new Date().toLocaleDateString() });
-            localStorage.setItem('reader_notes', JSON.stringify(notasGuardadas));
+
+            const anchor = (formatoActual === 'epub' && epubRangeActual)
+                ? { type: 'epub-cfi', cfi: epubRangeActual }
+                : null;
+
+            // Placeholder: aquí iría la llamada real a una API de traducción.
+            const traducido = `[Traducido]: ${textoSeleccionadoActual}`;
+
+            await guardarAnotacion({
+                tipo: 'Traducción',
+                texto: traducido,
+                original: textoSeleccionadoActual,
+                anchor
+            });
+
             ocultarMenuFlotante();
-            alert("Traducción guardada en Notas.");
         }
 
-        function menuNota() {
+        async function menuNota() {
             if (!textoSeleccionadoActual) {
                 alert("Ningún texto seleccionado.");
                 return;
             }
-            notasGuardadas.push({ tipo: 'Nota', texto: textoSeleccionadoActual, fecha: new Date().toLocaleDateString() });
-            localStorage.setItem('reader_notes', JSON.stringify(notasGuardadas));
+
+            const anchor = (formatoActual === 'epub' && epubRangeActual)
+                ? { type: 'epub-cfi', cfi: epubRangeActual }
+                : (formatoActual === 'pdf' ? { type: 'pdf-page', page: pageNum } : null);
+
+            await guardarAnotacion({
+                tipo: 'Nota',
+                texto: textoSeleccionadoActual,
+                original: textoSeleccionadoActual,
+                anchor
+            });
+
             ocultarMenuFlotante();
-            alert("Nota guardada correctamente.");
         }
 
+        // ---------- Navegación del libro ----------
         function libroSiguiente() {
             ocultarMenuFlotante();
             if (formatoActual === 'epub' && rendition) {
@@ -400,10 +501,11 @@
             }
         }
 
+        // ---------- Modos y zoom ----------
         function cambiarModoDesplegable(modo) {
             document.documentElement.classList.remove('modo-noche', 'modo-evook');
             document.body.classList.remove('modo-noche', 'modo-evook');
-            
+
             if (modo === 'noche') {
                 document.documentElement.classList.add('modo-noche');
                 document.body.classList.add('modo-noche');
@@ -417,7 +519,7 @@
             zoomActivo = !zoomActivo;
             const container = document.getElementById('viewer-container');
             const btn = document.getElementById('btn-zoom');
-            
+
             if (zoomActivo) {
                 container.classList.add('zoom-activo');
                 btn.innerText = "Zoom: On (Libre)";
@@ -427,22 +529,53 @@
             }
         }
 
-        function renderizarNotas() {
+        // ---------- Notas ----------
+        async function renderizarNotas() {
             const contenedor = document.getElementById('lista-notas');
-            if (notasGuardadas.length === 0) {
+
+            if (!tgUserId) {
+                contenedor.innerHTML = '<p>Usuario de Telegram no disponible.</p>';
+                return;
+            }
+
+            contenedor.innerHTML = '<p>Cargando notas...</p>';
+
+            const { data, error } = await supabaseClient
+                .from('reader_annotations')
+                .select('*')
+                .eq('user_id', tgUserId)
+                .is('deleted_at', null)
+                .order('created_at', { ascending: false });
+
+            if (error) {
+                contenedor.innerHTML = `<p style="color:red;">Error: ${error.message}</p>`;
+                return;
+            }
+
+            if (!data || data.length === 0) {
                 contenedor.innerHTML = '<p>No hay notas guardadas aún.</p>';
                 return;
             }
+
             contenedor.innerHTML = '';
-            notasGuardadas.forEach((nota) => {
+            data.forEach(n => {
                 const div = document.createElement('div');
                 div.className = 'nota-item';
-                div.innerHTML = `<strong>${nota.tipo} (${nota.fecha}):</strong><p>${nota.texto}</p>`;
+                const fecha = new Date(n.created_at).toLocaleString();
+                div.innerHTML = `
+                    <strong>${n.annotation_type} — ${n.book_title || 'Sin título'}</strong>
+                    <p>${n.text_content}</p>
+                    <small>${fecha}</small>
+                `;
                 contenedor.appendChild(div);
             });
         }
 
+        // ---------- Arranque ----------
         window.onload = () => {
+            if (!tgUserId) {
+                console.warn('Telegram user id no disponible. Abre la app desde Telegram.');
+            }
             cargarBiblioteca();
         };
     </script>
