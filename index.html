@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Lector Pro - Telegram Mini App</title>
+    <title>Lector Pro con Búsqueda - Telegram Mini App</title>
     
     <!-- SDK de Telegram WebApp -->
     <script src="https://telegram.org/js/telegram-web-app.js"></script>
@@ -16,7 +16,6 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.16.105/pdf.min.js"></script>
 
     <style>
-        /* Temas de Visualización */
         :root.theme-day {
             --bg-color: #ffffff;
             --text-color: #222222;
@@ -36,7 +35,7 @@
         }
 
         :root.theme-ebook {
-            --bg-color: #fbf0d9; /* Tono Sepia / Papel antiguo */
+            --bg-color: #fbf0d9;
             --text-color: #5f4b32;
             --header-bg: #f1e2c8;
             --border-color: #dfceb2;
@@ -108,6 +107,63 @@
             line-height: 1.6;
         }
 
+        /* Botón flotante para destacar texto */
+        #highlight-btn {
+            position: absolute;
+            display: none;
+            background-color: #ffeb3b;
+            color: #333;
+            border: 1px solid #fbc02d;
+            padding: 6px 12px;
+            border-radius: 20px;
+            font-weight: 600;
+            font-size: 12px;
+            cursor: pointer;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.2);
+            z-index: 1000;
+        }
+
+        /* Panel de búsqueda (Lupa) */
+        #search-modal {
+            position: absolute;
+            top: 50px;
+            right: 10px;
+            width: 280px;
+            background: var(--header-bg);
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            padding: 10px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+            display: none;
+            z-index: 2000;
+        }
+
+        #search-modal input {
+            width: calc(100% - 16px);
+            padding: 6px;
+            margin-bottom: 8px;
+            border: 1px solid var(--border-color);
+            border-radius: 4px;
+            background: var(--bg-color);
+            color: var(--text-color);
+        }
+
+        #search-results {
+            max-height: 150px;
+            overflow-y: auto;
+            font-size: 12px;
+        }
+
+        .search-result-item {
+            padding: 6px;
+            border-bottom: 1px solid var(--border-color);
+            cursor: pointer;
+        }
+
+        .search-result-item:hover {
+            opacity: 0.7;
+        }
+
         #nav-controls {
             display: none;
             justify-content: space-between;
@@ -153,12 +209,12 @@
     <div id="header">
         <span id="book-title">Cargando lector...</span>
         <div id="toolbar">
+            <button onclick="toggleSearchModal()">🔍 Lupa</button>
             <select id="theme-selector" onchange="cambiarTema(this.value)">
                 <option value="day">☀️ Día</option>
                 <option value="night">🌙 Noche</option>
                 <option value="ebook">📖 Ebook</option>
             </select>
-            <span id="page-info"></span>
         </div>
     </div>
 
@@ -168,6 +224,16 @@
         <div id="epub-viewer"></div>
         <div id="pdf-viewer" style="display:none;"><canvas id="pdf-canvas"></canvas></div>
         <div id="txt-viewer" style="display:none;"></div>
+        
+        <!-- Botón flotante de destacados -->
+        <button id="highlight-btn" onclick="guardarDestacado()">✨ Destacar</button>
+
+        <!-- Modal de Búsqueda (Lupa) -->
+        <div id="search-modal">
+            <input type="text" id="search-input" placeholder="Buscar palabra..." onkeypress="if(event.key === 'Enter') ejecutarBusqueda()">
+            <button onclick="ejecutarBusqueda()" style="width: 100%;">Buscar</button>
+            <div id="search-results"></div>
+        </div>
     </div>
 
     <div id="nav-controls">
@@ -179,11 +245,10 @@
         const tg = window.Telegram.WebApp;
         tg.expand();
 
-        // URL de prueba (Soporta .epub, .pdf, .txt)
         const sampleUrl = "https://s3.amazonaws.com/epubjs/books/alice.epub"; 
-
         let epubBook, epubRendition;
         let pdfDoc = null, pageNum = 1, pdfScale = 1.2;
+        let textoSeleccionadoActual = "";
 
         async function initReader(fileUrl) {
             try {
@@ -207,12 +272,9 @@
             }
         }
 
-        // --- GESTIÓN DE TEMAS (Día, Noche, Ebook) ---
+        // --- GESTIÓN DE TEMAS ---
         function cambiarTema(themeName) {
-            // Cambiar clase en el body para la app general
             document.body.className = `theme-${themeName}`;
-
-            // Si hay un EPUB activo, adaptar sus estilos internos mediante ePub.js
             if (epubRendition) {
                 const themes = {
                     day: { body: { background: "#ffffff", color: "#222222" } },
@@ -222,6 +284,92 @@
                 epubRendition.themes.register("custom", themes[themeName]);
                 epubRendition.themes.select("custom");
             }
+        }
+
+        // --- FUNCIONALIDAD DE BÚSQUEDA (LUPA) ---
+        function toggleSearchModal() {
+            const modal = document.getElementById('search-modal');
+            modal.style.display = modal.style.display === 'block' ? 'none' : 'block';
+        }
+
+        async function ejecutarBusqueda() {
+            const query = document.getElementById('search-input').value.trim();
+            const resultsContainer = document.getElementById('search-results');
+            resultsContainer.innerHTML = "Buscando...";
+
+            if (!query) {
+                resultsContainer.innerHTML = "Escribe una palabra.";
+                return;
+            }
+
+            if (epubBook) {
+                // Búsqueda integrada en EPUB.js
+                resultsContainer.innerHTML = "";
+                const results = await Promise.all(
+                    epubBook.spine.spineItems.map(item => 
+                        item.load(epubBook.load.bind(epubBook))
+                            .then(section => {
+                                const matches = section.find(query);
+                                item.unload();
+                                return matches;
+                            })
+                    )
+                );
+
+                const flattened = results.flat();
+                if (flattened.length === 0) {
+                    resultsContainer.innerHTML = "No se encontraron resultados.";
+                    return;
+                }
+
+                flattened.forEach(match => {
+                    const div = document.createElement('div');
+                    div.className = 'search-result-item';
+                    div.innerText = match.excerpt;
+                    div.onclick = () => {
+                        epubRendition.display(match.cfi);
+                        toggleSearchModal();
+                    };
+                    resultsContainer.appendChild(div);
+                });
+            } else {
+                resultsContainer.innerHTML = "Búsqueda disponible en formato EPUB.";
+            }
+        }
+
+        // --- DETECCIÓN DE SELECCIÓN DE TEXTO ---
+        document.addEventListener('mouseup', mostrarBotonDestacar);
+        document.addEventListener('touchend', mostrarBotonDestacar);
+
+        function mostrarBotonDestacar(e) {
+            const selection = window.getSelection();
+            const btn = document.getElementById('highlight-btn');
+
+            if (selection.toString().trim().length > 0) {
+                textoSeleccionadoActual = selection.toString();
+                const range = selection.getRangeAt(0);
+                const rect = range.getBoundingClientRect();
+
+                btn.style.top = `${rect.top - 40 + window.scrollY}px`;
+                btn.style.left = `${rect.left + (rect.width / 2) - 40}px`;
+                btn.style.display = 'block';
+            } else {
+                if (e.target.id !== 'highlight-btn') {
+                    btn.style.display = 'none';
+                }
+            }
+        }
+
+        function guardarDestacado() {
+            if (!textoSeleccionadoActual) return;
+
+            let destacados = JSON.parse(localStorage.getItem('libros_destacados') || '[]');
+            destacados.push(textoSeleccionadoActual);
+            localStorage.setItem('libros_destacados', JSON.stringify(destacados));
+
+            alert("¡Párrafo destacado guardado con éxito!");
+            document.getElementById('highlight-btn').style.display = 'none';
+            window.getSelection().removeAllRanges();
         }
 
         // --- EPUB RENDERER ---
@@ -236,9 +384,13 @@
                 height: "100%"
             });
             epubRendition.display();
-
-            // Aplicar el tema inicial por defecto
             cambiarTema(document.getElementById('theme-selector').value);
+
+            epubRendition.on("selected", (cfiRange, contents) => {
+                textoSeleccionadoActual = contents.window.getSelection().toString();
+                const btn = document.getElementById('highlight-btn');
+                btn.style.display = 'block';
+            });
 
             document.getElementById('prev-btn').onclick = () => epubRendition.prev();
             document.getElementById('next-btn').onclick = () => epubRendition.next();
