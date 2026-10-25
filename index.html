@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Lector Pro Cloud Plus - Telegram Mini App</title>
+    <title>Lector Pro Supabase - Telegram Mini App</title>
     
     <!-- SDK de Telegram WebApp -->
     <script src="https://telegram.org/js/telegram-web-app.js"></script>
@@ -143,7 +143,6 @@
             width: 100%;
         }
 
-        /* Menú Flotante de Selección Corregido y Claro */
         #selection-menu {
             position: fixed;
             display: none;
@@ -167,7 +166,6 @@
             font-weight: 600;
         }
 
-        /* Panel Lateral de Notas (Sidebar) limpio fuera del área del libro */
         #notes-sidebar {
             position: absolute;
             top: 0;
@@ -212,7 +210,6 @@
             border-radius: 4px;
         }
 
-        /* Modal de Búsqueda y Zoom */
         #search-modal {
             position: absolute;
             top: 45px;
@@ -312,13 +309,11 @@
 
     <div id="loading">Cargando...</div>
 
-    <!-- VISTA BIBLIOTECA -->
     <div id="library-view">
-        <div class="library-title">📚 Mi Biblioteca</div>
-        <div id="books-list">Cargando libros...</div>
+        <div class="library-title">📚 Mi Biblioteca en la Nube</div>
+        <div id="books-list">Cargando libros desde Supabase...</div>
     </div>
 
-    <!-- VISTA LECTOR -->
     <div id="reader-view">
         <div id="header">
             <button onclick="volverABiblioteca()">⬅ Biblioteca</button>
@@ -339,21 +334,18 @@
             <div id="pdf-viewer" style="display:none;"><canvas id="pdf-canvas"></canvas></div>
             <div id="txt-viewer" style="display:none;" ondblclick="abrirZoom(this.innerText)"></div>
             
-            <!-- Menú Flotante de Selección Actualizado -->
             <div id="selection-menu">
                 <button class="floating-btn" onclick="guardarDestacado()">✨ Destacar</button>
                 <button class="floating-btn" onclick="traducirTextoSelection()">🌐 Traducir</button>
                 <button class="floating-btn" onclick="abrirZoom(textoSeleccionadoActual)">🔍 Zoom</button>
             </div>
 
-            <!-- Modal de Búsqueda -->
-            <div id="search-modal" class="modal">
+            <div id="search-modal" class="modal" style="position: absolute; top: 45px; right: 10px; width: 280px; background: var(--header-bg); border: 1px solid var(--border-color); border-radius: 8px; padding: 12px; box-shadow: 0 4px 12px rgba(0,0,0,0.15); display: none; z-index: 2000;">
                 <input type="text" id="search-input" placeholder="Buscar..." onkeypress="if(event.key === 'Enter') ejecutarBusqueda()">
                 <button onclick="ejecutarBusqueda()" style="width: 100%;">Buscar</button>
                 <div id="search-results" style="margin-top: 8px;"></div>
             </div>
 
-            <!-- Panel Lateral de Notas -->
             <div id="notes-sidebar">
                 <div class="sidebar-header">
                     <span>📝 Mis Notas y Traducciones</span>
@@ -370,7 +362,6 @@
         </div>
     </div>
 
-    <!-- Modal de Zoom -->
     <div id="zoom-modal">
         <div style="font-weight:bold; font-size:14px; margin-bottom:10px;">🔍 Vista Ampliada (Zoom de Párrafo)</div>
         <div id="zoom-content"></div>
@@ -381,40 +372,33 @@
         const tg = window.Telegram.WebApp;
         tg.expand();
 
+        // Inserta tus credenciales reales de Supabase aquí
         const SUPABASE_URL = 'TUS_SUPABASE_URL';
         const SUPABASE_ANON_KEY = 'TUS_SUPABASE_ANON_KEY';
-        let supabaseClient = null;
-
-        if (SUPABASE_URL !== 'TUS_SUPABASE_URL' && SUPABASE_ANON_KEY !== 'TUS_SUPABASE_ANON_KEY') {
-            supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
-        }
+        const supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
         const userId = tg.initDataUnsafe.user ? tg.initDataUnsafe.user.id : 'usuario_demo';
         let libroActualId = null;
         let epubBook, epubRendition;
         let pdfDoc = null, pageNum = 1, pdfScale = 1.2;
         let textoSeleccionadoActual = "";
-        let cfiRangeActual = null; // Para pintar el resaltado en EPUB
-
-        const librosDemo = [
-            { id: '1', titulo: 'Alicia en el País de las Maravillas (EPUB)', epub_url: 'https://s3.amazonaws.com/epubjs/books/alice.epub' }
-        ];
+        let cfiRangeActual = null;
 
         async function cargarBiblioteca() {
             try {
                 showLoading(true);
-                let data = null;
-
-                if (supabaseClient) {
-                    const { data: dbData, error } = await supabaseClient.from('libros').select('id, titulo, epub_url');
-                    if (!error) data = dbData;
-                }
-
-                if (!data || data.length === 0) data = librosDemo;
+                const { data, error } = await supabaseClient.from('libros').select('id, titulo, epub_url');
+                if (error) throw error;
 
                 const listContainer = document.getElementById('books-list');
                 listContainer.innerHTML = '';
                 
+                if (!data || data.length === 0) {
+                    listContainer.innerHTML = 'No hay libros en la base de datos de Supabase.';
+                    showLoading(false);
+                    return;
+                }
+
                 data.forEach(libro => {
                     const card = document.createElement('div');
                     card.className = 'book-card';
@@ -425,7 +409,7 @@
                 showLoading(false);
             } catch (err) {
                 console.error(err);
-                document.getElementById('books-list').innerHTML = 'Error al cargar la biblioteca.';
+                document.getElementById('books-list').innerHTML = 'Error al conectar con Supabase. Revisa las credenciales.';
                 showLoading(false);
             }
         }
@@ -439,15 +423,12 @@
             const extension = libro.epub_url.split('.').pop().toLowerCase().split('?')[0];
             showLoading(true);
 
-            let posicionGuardada = null;
-            if (supabaseClient) {
-                const { data: progresoData } = await supabaseClient
-                    .from('progreso_lectura').select('posicion')
-                    .eq('user_id', userId).eq('libro_id', libroActualId).single();
-                if (progresoData) posicionGuardada = progresoData.posicion;
-            } else {
-                posicionGuardada = localStorage.getItem(`progreso_${libroActualId}`);
-            }
+            // Obtener progreso desde Supabase
+            const { data: progresoData } = await supabaseClient
+                .from('progreso_lectura').select('posicion')
+                .eq('user_id', userId).eq('libro_id', libroActualId).single();
+
+            const posicionGuardada = progresoData ? progresoData.posicion : null;
 
             if (extension === 'epub') initEpub(libro.epub_url, posicionGuardada);
             else if (extension === 'pdf') initPdf(libro.epub_url, posicionGuardada ? parseInt(posicionGuardada) : 1);
@@ -463,13 +444,9 @@
 
         async function guardarProgresoEnNube(posicion) {
             if (!libroActualId) return;
-            if (supabaseClient) {
-                await supabaseClient.from('progreso_lectura').upsert({
-                    user_id: userId, libro_id: libroActualId, posicion: String(posicion), updated_at: new Date()
-                }, { onConflict: 'user_id,libro_id' });
-            } else {
-                localStorage.setItem(`progreso_${libroActualId}`, String(posicion));
-            }
+            await supabaseClient.from('progreso_lectura').upsert({
+                user_id: userId, libro_id: libroActualId, posicion: String(posicion), updated_at: new Date()
+            }, { onConflict: 'user_id,libro_id' });
         }
 
         function cambiarTema(themeName) {
@@ -490,16 +467,11 @@
             modal.style.display = modal.style.display === 'block' ? 'none' : 'block';
         }
 
-        // Abrir panel lateral y reajustar el visor para que no se mezcle el texto
         function toggleSidebar() {
             const sidebar = document.getElementById('notes-sidebar');
             sidebar.classList.toggle('open');
-            if (sidebar.classList.contains('open')) {
-                cargarNotasGuardadas();
-            }
-            setTimeout(() => {
-                if (epubRendition) epubRendition.resize();
-            }, 300);
+            if (sidebar.classList.contains('open')) cargarNotasGuardadas();
+            setTimeout(() => { if (epubRendition) epubRendition.resize(); }, 300);
         }
 
         function abrirZoom(texto) {
@@ -532,23 +504,17 @@
             }
         }
 
-        // GUARDAR NOTA Y RESALTAR VISUALMENTE EN EL LIBRO
         function guardarDestacado() {
             if (!textoSeleccionadoActual) return;
-            
-            // 1. Guardar en notas locales
             let destacados = JSON.parse(localStorage.getItem(`destacados_${libroActualId}`) || '[]');
             destacados.push(`✨ ${textoSeleccionadoActual}`);
             localStorage.setItem(`destacados_${libroActualId}`, JSON.stringify(destacados));
 
-            // 2. Pintar / Resaltar visualmente sobre el libro EPUB si está activo
             if (epubRendition && cfiRangeActual) {
-                epubRendition.annotations.add("highlight", cfiRangeActual, { "data-book-note": "true" }, (e) => {
-                    console.log("Nota resaltada clicada", e);
-                }, "highlight", { fill: "yellow", "fill-opacity": "0.3", mixBlendMode: "multiply" });
+                epubRendition.annotations.add("highlight", cfiRangeActual, {}, (e) => {}, "highlight", { fill: "yellow", "fill-opacity": "0.3" });
             }
 
-            alert("¡Párrafo destacado y guardado en Notas!");
+            alert("¡Párrafo destacado guardado!");
             document.getElementById('selection-menu').style.display = 'none';
             cargarNotasGuardadas();
         }
@@ -638,7 +604,7 @@
                     resultsContainer.appendChild(div);
                 });
             } else {
-                resultsContainer.innerHTML = "Búsqueda disponible en formato EPUB.";
+                resultsContainer.innerHTML = "Búsqueda disponible en EPUB.";
             }
         }
 
@@ -658,7 +624,6 @@
                 guardarProgresoEnNube(location.start.cfi);
             });
 
-            // Capturar la selección y el rango CFI para poder resaltarlo visualmente
             epubRendition.on("selected", (cfiRange, contents) => {
                 cfiRangeActual = cfiRange;
                 textoSeleccionadoActual = contents.window.getSelection().toString();
