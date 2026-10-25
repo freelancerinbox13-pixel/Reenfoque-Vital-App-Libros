@@ -113,7 +113,7 @@
         const tg = window.Telegram.WebApp;
         tg.expand();
 
-        // Configuración de Supabase con tus credenciales integradas
+        // Configuración de Supabase
         const SUPABASE_URL = 'https://augjyfnnzserfdoekkrp.supabase.co';
         const SUPABASE_ANON_KEY = 'sb_publishable_ed7WzU7SyteyxrAk5qE44w_N2vslpMU';
         const supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
@@ -131,13 +131,21 @@
             if (seccion === 'notas') renderizarNotas();
         }
 
-        // Cargar biblioteca desde Supabase
+        // Cargar biblioteca desde Supabase con manejo de errores detallado
         async function cargarBiblioteca() {
-            const { data, error } = await supabaseClient.from('libros').select('*');
             const contenedor = document.getElementById('lista-libros');
+            contenedor.innerHTML = '<p>Cargando biblioteca...</p>';
+
+            const { data, error } = await supabaseClient.from('libros').select('*');
             
-            if (error || !data || data.length === 0) {
-                contenedor.innerHTML = '<p>No se encontraron libros o error de conexión.</p>';
+            if (error) {
+                console.error("Error al consultar Supabase:", error);
+                contenedor.innerHTML = `<p style="color: red;">Error al cargar: ${error.message}</p>`;
+                return;
+            }
+
+            if (!data || data.length === 0) {
+                contenedor.innerHTML = '<p>La tabla de libros está vacía o no se encontraron registros.</p>';
                 return;
             }
 
@@ -147,7 +155,7 @@
                 card.className = 'libro-card';
                 card.innerHTML = `
                     <div style="background:#ddd; height:120px; border-radius:4px; margin-bottom:8px; display:flex; align-items:center; justify-content:center;">📖</div>
-                    <h3>${libro.titulo}</h3>
+                    <h3>${libro.titulo || 'Sin título'}</h3>
                 `;
                 card.onclick = () => abrirLibro(libro.url_archivo);
                 contenedor.appendChild(card);
@@ -156,6 +164,10 @@
 
         // Abrir y renderizar EPUB
         function abrirLibro(url) {
+            if (!url) {
+                alert("Este libro no tiene una URL de archivo válida.");
+                return;
+            }
             cambiarSeccion('lector');
             document.getElementById('viewer').innerHTML = '';
             
@@ -165,7 +177,6 @@
                 height: "100%"
             });
 
-            // Restaurar última página leída si existe
             let ultimaUbicacion = localStorage.getItem('last_loc_' + url);
             rendition.display(ultimaUbicacion || undefined);
 
@@ -190,7 +201,7 @@
             if (modo === 'evook') document.body.classList.add('modo-evook');
         }
 
-        // Zoom y bloqueo de movimiento
+        // Zoom y movimiento libre
         function toggleZoom() {
             zoomActivo = !zoomActivo;
             const viewer = document.getElementById('viewer');
@@ -237,7 +248,7 @@
                 return;
             }
             contenedor.innerHTML = '';
-            notasGuardadas.forEach((nota, index) => {
+            notasGuardadas.forEach((nota) => {
                 const div = document.createElement('div');
                 div.className = 'nota-item';
                 div.innerHTML = `<strong>${nota.tipo} (${nota.fecha}):</strong><p>${nota.texto}</p>`;
