@@ -45,8 +45,8 @@
 
         /* Biblioteca */
         .grid-libros { display: grid; grid-template-columns: repeat(auto-fill, minmax(130px, 1fr)); gap: 16px; }
-        .libro-card { background: var(--card-bg); padding: 12px; border-radius: 8px; text-align: center; cursor: pointer; }
-        .libro-card h3 { font-size: 14px; margin-top: 8px; }
+        .libro-card { background: var(--card-bg); padding: 12px; border-radius: 8px; text-align: center; cursor: pointer; box-shadow: 0 2px 4px rgba(0,0,0,0.05); }
+        .libro-card h3 { font-size: 14px; margin-top: 8px; word-break: break-word; }
 
         /* Visor de lectura */
         #viewer-container { flex: 1; position: relative; overflow: hidden; display: flex; flex-direction: column; }
@@ -116,7 +116,7 @@
         const tg = window.Telegram.WebApp;
         tg.expand();
 
-        // Configuración de Supabase
+        // Configuración de Supabase con tus credenciales
         const SUPABASE_URL = 'https://augjyfnnzserfdoekkrp.supabase.co';
         const SUPABASE_ANON_KEY = 'sb_publishable_ed7WzU7SyteyxrAk5qE44w_N2vslpMU';
         const supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
@@ -126,13 +126,13 @@
         let notasGuardadas = JSON.parse(localStorage.getItem('reader_notes') || '[]');
         let zoomActivo = false;
 
-        // Variables específicas para control de PDF
+        // Variables de control de PDF
         let pdfDoc = null;
         let pageNum = 1;
         let formatoActual = '';
         let urlActualGlobal = '';
 
-        // Navegación entre secciones
+        // Función para cambiar de sección visual en la Mini App
         function cambiarSeccion(seccion) {
             document.querySelectorAll('.seccion').forEach(s => s.classList.remove('activa'));
             document.getElementById(`seccion-${seccion}`).classList.add('activa');
@@ -140,23 +140,25 @@
             if (seccion === 'notas') renderizarNotas();
         }
 
-        // Cargar biblioteca desde Supabase
+        // Función principal para cargar la biblioteca desde Supabase con manejo estricto de errores
         async function cargarBiblioteca() {
             const contenedor = document.getElementById('lista-libros');
-            contenedor.innerHTML = '<p>Cargando biblioteca...</p>';
+            contenedor.innerHTML = '<p>Conectando con Supabase...</p>';
 
             const { data, error } = await supabaseClient.from('libros').select('*');
             
             if (error) {
-                contenedor.innerHTML = `<p style="color: red;">Error: ${error.message}</p>`;
+                console.error("Error al consultar Supabase:", error);
+                contenedor.innerHTML = `<p style="color: red;">Error de conexión: ${error.message}</p>`;
                 return;
             }
 
             if (!data || data.length === 0) {
-                contenedor.innerHTML = '<p>No se encontraron libros.</p>';
+                contenedor.innerHTML = '<p>La tabla de libros está vacía en Supabase. Por favor, inserta al menos una fila con el título y la URL del archivo.</p>';
                 return;
             }
 
+            // Limpiamos y construimos las tarjetas de libros dinámicamente
             contenedor.innerHTML = '';
             data.forEach(libro => {
                 const card = document.createElement('div');
@@ -165,15 +167,16 @@
                     <div style="background:#ddd; height:120px; border-radius:4px; margin-bottom:8px; display:flex; align-items:center; justify-content:center;">📖</div>
                     <h3>${libro.titulo || 'Sin título'}</h3>
                 `;
+                // Al hacer clic pasamos la URL del archivo almacenada en Supabase
                 card.onclick = () => abrirLibro(libro.url_archivo);
                 contenedor.appendChild(card);
             });
         }
 
-        // Abrir libro detectando si es EPUB o PDF
+        // Función para abrir libros detectando formato EPUB o PDF
         function abrirLibro(url) {
             if (!url) {
-                alert("URL de archivo no válida.");
+                alert("Este libro no tiene una URL de archivo válida registrada.");
                 return;
             }
             urlActualGlobal = url;
@@ -181,7 +184,6 @@
             const viewer = document.getElementById('viewer');
             viewer.innerHTML = '';
 
-            // Detectar formato por extensión en la URL
             if (url.toLowerCase().includes('.pdf')) {
                 formatoActual = 'pdf';
                 cargarPdf(url);
@@ -191,7 +193,7 @@
             }
         }
 
-        // Renderizar EPUB
+        // Renderizado de archivos EPUB con ePub.js
         function cargarEpub(url) {
             book = ePub(url);
             rendition = book.renderTo("viewer", { width: "100%", height: "100%" });
@@ -209,7 +211,7 @@
             book.locations.generate(1024);
         }
 
-        // Renderizar PDF usando PDF.js
+        // Renderizado de archivos PDF con PDF.js
         function cargarPdf(url) {
             pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.16.105/pdf.worker.min.js';
             
@@ -220,8 +222,8 @@
                 pdfDoc = pdfDoc_;
                 renderizarPaginaPdf(pageNum);
             }).catch(err => {
-                console.error("Error al cargar PDF:", err);
-                document.getElementById('viewer').innerHTML = '<p style="color:red;">Error al cargar el documento PDF.</p>';
+                console.error("Error al cargar el PDF:", err);
+                document.getElementById('viewer').innerHTML = '<p style="color:red;">Error al cargar el documento PDF. Verifica que la URL sea accesible públicamente.</p>';
             });
         }
 
@@ -245,7 +247,7 @@
             });
         }
 
-        // Navegación Siguiente / Anterior universal
+        // Navegación de páginas
         function libroSiguiente() {
             if (formatoActual === 'epub' && rendition) {
                 rendition.next();
@@ -268,14 +270,14 @@
             }
         }
 
-        // Modos de lectura
+        // Modos de lectura (Día, Noche, E-book)
         function setModoLectura(modo) {
             document.body.classList.remove('modo-noche', 'modo-evook');
             if (modo === 'noche') document.body.classList.add('modo-noche');
             if (modo === 'evook') document.body.classList.add('modo-evook');
         }
 
-        // Zoom y movimiento libre
+        // Control de zoom
         function toggleZoom() {
             zoomActivo = !zoomActivo;
             const viewer = document.getElementById('viewer');
@@ -291,16 +293,16 @@
             }
         }
 
-        // Traductor y Notas
+        // Gestión de traducciones y notas
         function traducirTextoSeleccionado() {
             const seleccion = window.getSelection().toString();
             if (!seleccion) {
-                alert("Selecciona texto primero.");
+                alert("Selecciona texto en la página primero.");
                 return;
             }
             notasGuardadas.push({ tipo: 'Traducción', texto: `[Traducido]: ${seleccion}`, fecha: new Date().toLocaleDateString() });
             localStorage.setItem('reader_notes', JSON.stringify(notasGuardadas));
-            alert("Traducción guardada.");
+            alert("Traducción guardada en Notas.");
         }
 
         function guardarNotaActual() {
@@ -311,7 +313,7 @@
             }
             notasGuardadas.push({ tipo: 'Nota', texto: seleccion, fecha: new Date().toLocaleDateString() });
             localStorage.setItem('reader_notes', JSON.stringify(notasGuardadas));
-            alert("Nota guardada.");
+            alert("Nota guardada correctamente.");
         }
 
         function renderizarNotas() {
@@ -329,6 +331,7 @@
             });
         }
 
+        // Inicialización al cargar la Mini App
         window.onload = () => {
             cargarBiblioteca();
         };
