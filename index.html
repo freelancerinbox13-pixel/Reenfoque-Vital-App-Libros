@@ -73,7 +73,7 @@
             font-size: 18px;
             font-weight: bold;
             margin-bottom: 12px;
-            color: #9ca3af !important;
+            color: var(--text-color);
         }
 
         .book-card {
@@ -86,7 +86,7 @@
             display: flex;
             align-items: center;
             gap: 12px;
-            color: #9ca3af !important;
+            color: var(--text-color);
         }
 
         .book-card img {
@@ -100,7 +100,7 @@
         .book-title-text {
             font-weight: 600;
             font-size: 14px;
-            color: #9ca3af !important;
+            color: var(--text-color);
         }
 
         #header {
@@ -109,7 +109,7 @@
             font-weight: 600;
             background-color: var(--header-bg);
             border-bottom: 2px solid var(--border-color);
-            color: #9ca3af;
+            color: var(--text-color);
             display: flex;
             justify-content: space-between;
             align-items: center;
@@ -166,6 +166,7 @@
             height: 100%;
             overflow-y: auto;
             box-sizing: border-box;
+            color: var(--text-color);
         }
 
         #selection-menu {
@@ -198,7 +199,7 @@
             background: var(--header-bg);
             border-radius: 6px;
             font-size: 13px;
-            color: #9ca3af !important;
+            color: var(--text-color);
         }
 
         #search-results-container {
@@ -235,7 +236,7 @@
             height: 50px;
             box-sizing: border-box;
             z-index: 50;
-            color: #9ca3af;
+            color: var(--text-color);
         }
 
         button, select, input[type="text"] {
@@ -289,17 +290,17 @@
     <!-- 2. VISTA LECTOR -->
     <div id="reader-view" class="view-screen">
         <div id="header">
-            <button onclick="irABiblioteca()" style="color: #9ca3af; background: #374151;">⬅ Biblio</button>
+            <button onclick="irABiblioteca()" style="background: var(--button-bg); color: var(--button-text);">⬅ Biblio</button>
             <div style="display: flex; align-items: center; gap: 3px;">
-                <span style="font-size: 10px; color: #9ca3af; font-weight: bold;">Zoom:</span>
+                <span style="font-size: 10px; font-weight: bold;">Zoom:</span>
                 <input type="range" id="zoom-range" min="100" max="250" value="100" style="width: 55px;" oninput="aplicarZoomManual(this.value)">
             </div>
             <div style="display: flex; align-items: center; gap: 3px;">
                 <input type="text" id="search-input" placeholder="Buscar..." style="width: 70px;" onkeypress="if(event.key === 'Enter') ejecutarBusqueda()">
-                <button onclick="ejecutarBusqueda()" style="color: #111; background: #eab308;">🔍</button>
+                <button onclick="ejecutarBusqueda()">🔍</button>
             </div>
             <div style="display: flex; gap: 4px; align-items: center;">
-                <button onclick="irANotas()" style="color: #9ca3af; background: #374151;">📝</button>
+                <button onclick="irANotas()">📝</button>
                 <select id="theme-selector" onchange="cambiarTema(this.value)">
                     <option value="day">☀️ Día</option>
                     <option value="night">🌙 Noche</option>
@@ -329,20 +330,20 @@
         </div>
 
         <div id="nav-controls">
-            <button id="prev-btn" style="color: #9ca3af; background: #374151;">Anterior</button>
-            <span id="page-info" style="color: #eab308; font-weight: bold;">0%</span>
-            <button id="next-btn" style="color: #9ca3af; background: #374151;">Siguiente</button>
+            <button id="prev-btn">Anterior</button>
+            <span id="page-info" style="color: var(--button-bg); font-weight: bold;">0%</span>
+            <button id="next-btn">Siguiente</button>
         </div>
     </div>
 
     <!-- 3. VISTA DE NOTAS -->
     <div id="notes-view" class="view-screen">
         <div id="header">
-            <button onclick="irALector()" style="color: #9ca3af; background: #374151;">⬅ Volver</button>
-            <span class="notes-title" style="margin: 0; color: #9ca3af;">📝 Notas</span>
+            <button onclick="irALector()">⬅ Volver</button>
+            <span class="notes-title" style="margin: 0;">📝 Notas</span>
             <div></div>
         </div>
-        <div style="padding: 16px; flex: 1; overflow-y: auto; color: #9ca3af;">
+        <div style="padding: 16px; flex: 1; overflow-y: auto;">
             <div id="notes-list">Sin notas guardadas.</div>
         </div>
     </div>
@@ -393,7 +394,7 @@
                         <div style="flex: 1;">
                             <div class="book-title-text">${libro.titulo}</div>
                         </div>
-                        <button style="color: #9ca3af; background: #374151; padding: 6px 10px; border-radius: 6px; border: none; font-weight: bold;">Leer</button>
+                        <button>Leer</button>
                     `;
                     card.onclick = () => abrirLibro(libro);
                     listContainer.appendChild(card);
