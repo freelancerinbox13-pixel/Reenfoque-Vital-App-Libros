@@ -137,6 +137,15 @@
         let pageNum = 1;
         let formatoActual = '';
         let urlActualGlobal = '';
+        let ultimoTextoSeleccionado = '';
+
+        // Capturar la selección de texto en tiempo real antes de que se pierda el foco
+        document.addEventListener('selectionchange', () => {
+            const sel = window.getSelection().toString().trim();
+            if (sel.length > 0) {
+                ultimoTextoSeleccionado = sel;
+            }
+        });
 
         function cambiarSeccion(seccion) {
             document.querySelectorAll('.seccion').forEach(s => s.classList.remove('activa'));
@@ -296,26 +305,28 @@
             }
         }
 
-        // Función robusta para capturar texto seleccionado o permitir ingreso manual si el canvas lo bloquea
+        // Funciones de traducción y notas utilizando la memoria en tiempo real de selección
         function traducirTextoSeleccionado() {
-            let seleccion = window.getSelection().toString().trim();
-            if (!seleccion) {
-                seleccion = prompt("Escribe o pega la palabra o fragmento que deseas traducir:");
-                if (!seleccion) return;
+            let texto = ultimoTextoSeleccionado || window.getSelection().toString().trim();
+            if (!texto) {
+                texto = prompt("Introduce o pega el texto que deseas traducir:");
+                if (!texto) return;
             }
-            notasGuardadas.push({ tipo: 'Traducción', texto: `[Traducido]: ${seleccion}`, fecha: new Date().toLocaleDateString() });
+            notasGuardadas.push({ tipo: 'Traducción', texto: `[Traducido]: ${texto}`, fecha: new Date().toLocaleDateString() });
             localStorage.setItem('reader_notes', JSON.stringify(notasGuardadas));
+            ultimoTextoSeleccionado = '';
             alert("Traducción guardada en Notas.");
         }
 
         function guardarNotaActual() {
-            let seleccion = window.getSelection().toString().trim();
-            if (!seleccion) {
-                seleccion = prompt("Escribe o pega el párrafo o nota que deseas guardar:");
-                if (!seleccion) return;
+            let texto = ultimoTextoSeleccionado || window.getSelection().toString().trim();
+            if (!texto) {
+                texto = prompt("Introduce o pega el párrafo o nota que deseas guardar:");
+                if (!texto) return;
             }
-            notasGuardadas.push({ tipo: 'Nota', texto: seleccion, fecha: new Date().toLocaleDateString() });
+            notasGuardadas.push({ tipo: 'Nota', texto: texto, fecha: new Date().toLocaleDateString() });
             localStorage.setItem('reader_notes', JSON.stringify(notasGuardadas));
+            ultimoTextoSeleccionado = '';
             alert("Nota guardada correctamente.");
         }
 
