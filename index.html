@@ -6,9 +6,11 @@
     <title>Lector Mini App - Telegram</title>
     <!-- SDK de Telegram WebApp -->
     <script src="https://telegram.org/js/telegram-web-app.js"></script>
-    <!-- ePub.js para lectura de libros EPUB -->
+    <!-- ePub.js para archivos EPUB -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.1.5/jszip.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/epubjs/dist/epub.min.js"></script>
+    <!-- PDF.js para archivos PDF -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.16.105/pdf.min.js"></script>
     <!-- Supabase JS Client -->
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <style>
@@ -48,8 +50,9 @@
 
         /* Visor de lectura */
         #viewer-container { flex: 1; position: relative; overflow: hidden; display: flex; flex-direction: column; }
-        #viewer { flex: 1; width: 100%; height: 100%; }
+        #viewer { flex: 1; width: 100%; height: 100%; overflow: auto; display: flex; justify-content: center; align-items: flex-start; }
         #viewer.zoom-activo { overflow: auto !important; touch-action: pan-x pan-y; }
+        canvas { max-width: 100%; height: auto !important; }
         
         /* Controles de lectura inferiores */
         .reader-toolbar { display: flex; justify-content: space-between; align-items: center; padding: 10px 16px; background: var(--card-bg); font-size: 13px; }
@@ -94,7 +97,7 @@
 
             <div class="reader-toolbar">
                 <button class="btn" onclick="libroAnterior()">Anterior</button>
-                <span id="progreso-lectura">0% (Pág. 0/0)</span>
+                <span id="progreso-lectura">0%</span>
                 <button class="btn" onclick="libroSiguiente()">Siguiente</button>
             </div>
         </div>
@@ -123,6 +126,12 @@
         let notasGuardadas = JSON.parse(localStorage.getItem('reader_notes') || '[]');
         let zoomActivo = false;
 
+        // Variables específicas para control de PDF
+        let pdfDoc = null;
+        let pageNum = 1;
+        let formatoActual = '';
+        let urlActualGlobal = '';
+
         // Navegación entre secciones
         function cambiarSeccion(seccion) {
             document.querySelectorAll('.seccion').forEach(s => s.classList.remove('activa'));
@@ -131,7 +140,7 @@
             if (seccion === 'notas') renderizarNotas();
         }
 
-        // Cargar biblioteca desde Supabase con manejo de errores detallado
+        // Cargar biblioteca desde Supabase
         async function cargarBiblioteca() {
             const contenedor = document.getElementById('lista-libros');
             contenedor.innerHTML = '<p>Cargando biblioteca...</p>';
@@ -139,13 +148,12 @@
             const { data, error } = await supabaseClient.from('libros').select('*');
             
             if (error) {
-                console.error("Error al consultar Supabase:", error);
-                contenedor.innerHTML = `<p style="color: red;">Error al cargar: ${error.message}</p>`;
+                contenedor.innerHTML = `<p style="color: red;">Error: ${error.message}</p>`;
                 return;
             }
 
             if (!data || data.length === 0) {
-                contenedor.innerHTML = '<p>La tabla de libros está vacía o no se encontraron registros.</p>';
+                contenedor.innerHTML = '<p>No se encontraron libros.</p>';
                 return;
             }
 
@@ -162,20 +170,31 @@
             });
         }
 
-        // Abrir y renderizar EPUB
+        // Abrir libro detectando si es EPUB o PDF
         function abrirLibro(url) {
             if (!url) {
-                alert("Este libro no tiene una URL de archivo válida.");
+                alert("URL de archivo no válida.");
                 return;
             }
+            urlActualGlobal = url;
             cambiarSeccion('lector');
-            document.getElementById('viewer').innerHTML = '';
-            
+            const viewer = document.getElementById('viewer');
+            viewer.innerHTML = '';
+
+            // Detectar formato por extensión en la URL
+            if (url.toLowerCase().includes('.pdf')) {
+                formatoActual = 'pdf';
+                cargarPdf(url);
+            } else {
+                formatoActual = 'epub';
+                cargarEpub(url);
+            }
+        }
+
+        // Renderizar EPUB
+        function cargarEpub(url) {
             book = ePub(url);
-            rendition = book.renderTo("viewer", {
-                width: "100%",
-                height: "100%"
-            });
+            rendition = book.renderTo("viewer", { width: "100%", height: "100%" });
 
             let ultimaUbicacion = localStorage.getItem('last_loc_' + url);
             rendition.display(ultimaUbicacion || undefined);
@@ -187,12 +206,67 @@
                     localStorage.setItem('last_loc_' + url, location.start.cfi);
                 }
             });
-
             book.locations.generate(1024);
         }
 
-        function libroSiguiente() { if (rendition) rendition.next(); }
-        function libroAnterior() { if (rendition) rendition.prev(); }
+        // Renderizar PDF usando PDF.js
+        function cargarPdf(url) {
+            pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.16.105/pdf.worker.min.js';
+            
+            let ultimaPagina = parseInt(localStorage.getItem('last_page_' + url) || '1');
+            pageNum = ultimaPagina;
+
+            pdfjsLib.getDocument(url).promise.then(function(pdfDoc_) {
+                pdfDoc = pdfDoc_;
+                renderizarPaginaPdf(pageNum);
+            }).catch(err => {
+                console.error("Error al cargar PDF:", err);
+                document.getElementById('viewer').innerHTML = '<p style="color:red;">Error al cargar el documento PDF.</p>';
+            });
+        }
+
+        function renderizarPaginaPdf(num) {
+            pdfDoc.getPage(num).then(function(page) {
+                const canvas = document.createElement('canvas');
+                const ctx = canvas.getContext('2d');
+                const viewer = document.getElementById('viewer');
+                viewer.innerHTML = '';
+                viewer.appendChild(canvas);
+
+                const viewport = page.getViewport({ scale: 1.2 });
+                canvas.height = viewport.height;
+                canvas.width = viewport.width;
+
+                page.render({ canvasContext: ctx, viewport: viewport });
+
+                let porcentaje = Math.round((num / pdfDoc.numPages) * 100);
+                document.getElementById('progreso-lectura').innerText = `${porcentaje}% (Pág. ${num}/${pdfDoc.numPages})`;
+                localStorage.setItem('last_page_' + urlActualGlobal, num);
+            });
+        }
+
+        // Navegación Siguiente / Anterior universal
+        function libroSiguiente() {
+            if (formatoActual === 'epub' && rendition) {
+                rendition.next();
+            } else if (formatoActual === 'pdf' && pdfDoc) {
+                if (pageNum < pdfDoc.numPages) {
+                    pageNum++;
+                    renderizarPaginaPdf(pageNum);
+                }
+            }
+        }
+
+        function libroAnterior() {
+            if (formatoActual === 'epub' && rendition) {
+                rendition.prev();
+            } else if (formatoActual === 'pdf' && pdfDoc) {
+                if (pageNum > 1) {
+                    pageNum--;
+                    renderizarPaginaPdf(pageNum);
+                }
+            }
+        }
 
         // Modos de lectura
         function setModoLectura(modo) {
@@ -208,12 +282,12 @@
             const btn = document.getElementById('btn-zoom');
             if (zoomActivo) {
                 viewer.classList.add('zoom-activo');
-                btn.innerText = "Zoom: On (Movimiento libre)";
-                if(rendition) rendition.themes.fontSize("150%");
+                btn.innerText = "Zoom: On";
+                if(formatoActual === 'epub' && rendition) rendition.themes.fontSize("150%");
             } else {
                 viewer.classList.remove('zoom-activo');
                 btn.innerText = "Zoom: Off";
-                if(rendition) rendition.themes.fontSize("100%");
+                if(formatoActual === 'epub' && rendition) rendition.themes.fontSize("100%");
             }
         }
 
@@ -221,24 +295,23 @@
         function traducirTextoSeleccionado() {
             const seleccion = window.getSelection().toString();
             if (!seleccion) {
-                alert("Por favor, selecciona texto en la página primero.");
+                alert("Selecciona texto primero.");
                 return;
             }
-            const traduccion = `[Traducido]: ${seleccion}`;
-            notasGuardadas.push({ tipo: 'Traducción', texto: traduccion, fecha: new Date().toLocaleDateString() });
+            notasGuardadas.push({ tipo: 'Traducción', texto: `[Traducido]: ${seleccion}`, fecha: new Date().toLocaleDateString() });
             localStorage.setItem('reader_notes', JSON.stringify(notasGuardadas));
-            alert("Traducción guardada en el apartado de Notas.");
+            alert("Traducción guardada.");
         }
 
         function guardarNotaActual() {
             const seleccion = window.getSelection().toString();
             if (!seleccion) {
-                alert("Selecciona el párrafo que deseas guardar como nota.");
+                alert("Selecciona un párrafo primero.");
                 return;
             }
             notasGuardadas.push({ tipo: 'Nota', texto: seleccion, fecha: new Date().toLocaleDateString() });
             localStorage.setItem('reader_notes', JSON.stringify(notasGuardadas));
-            alert("Nota guardada correctamente.");
+            alert("Nota guardada.");
         }
 
         function renderizarNotas() {
@@ -256,7 +329,6 @@
             });
         }
 
-        // Inicializar carga al iniciar
         window.onload = () => {
             cargarBiblioteca();
         };
