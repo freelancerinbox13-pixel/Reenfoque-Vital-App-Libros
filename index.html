@@ -20,18 +20,18 @@
         :root.theme-day {
             --bg-color: #ffffff;
             --text-color: #111111;
-            --header-bg: #f0f2f5;
-            --border-color: #ccd0d5;
+            --header-bg: #e4e6eb;
+            --border-color: #bcc0c4;
             --button-bg: #1877f2;
             --button-text: #ffffff;
         }
 
         :root.theme-night {
-            --bg-color: #18191a;
-            --text-color: #e4e6eb;
-            --header-bg: #242526;
-            --border-color: #393a3b;
-            --button-bg: #2d88ff;
+            --bg-color: #121212;
+            --text-color: #f0f0f0;
+            --header-bg: #1e1e1e;
+            --border-color: #333333;
+            --button-bg: #3b82f6; /* Azul brillante de alto contraste */
             --button-text: #ffffff;
         }
 
@@ -40,7 +40,7 @@
             --text-color: #4a3b2c;
             --header-bg: #edd5b1;
             --border-color: #d4bc97;
-            --button-bg: #8c6d48;
+            --button-bg: #a07850;
             --button-text: #ffffff;
         }
 
@@ -95,10 +95,10 @@
             background: #ccc;
         }
 
-        /* Menú superior altamente visible y estructurado para móviles */
+        /* Menú superior con alto contraste en modo oscuro */
         #header {
-            padding: 4px 6px;
-            font-size: 11px;
+            padding: 6px 10px;
+            font-size: 12px;
             font-weight: 600;
             background-color: var(--header-bg);
             border-bottom: 2px solid var(--border-color);
@@ -106,7 +106,7 @@
             display: flex;
             justify-content: space-between;
             align-items: center;
-            height: 50px;
+            height: 52px;
             box-sizing: border-box;
             z-index: 50;
         }
@@ -115,16 +115,15 @@
             flex: 1;
             position: relative;
             width: 100%;
-            height: calc(100vh - 100px);
-            overflow: hidden;
+            height: calc(100vh - 102px);
+            overflow: auto; /* Permite desplazamiento libre en cualquier dirección */
+            -webkit-overflow-scrolling: touch;
         }
 
         #epub-viewer {
             width: 100%;
-            height: 100%;
-            position: absolute;
-            top: 0;
-            left: 0;
+            min-height: 100%;
+            position: relative;
         }
 
         #pdf-viewer {
@@ -156,12 +155,11 @@
             box-sizing: border-box;
         }
 
-        /* Menú Flotante de Selección Sólido */
         #selection-menu {
             position: fixed;
             display: none;
-            background-color: #222222;
-            border: 1px solid #555555;
+            background-color: #1f1f1f;
+            border: 1px solid #555;
             padding: 8px;
             border-radius: 12px;
             box-shadow: 0 8px 24px rgba(0,0,0,0.6);
@@ -170,7 +168,7 @@
         }
 
         .floating-btn {
-            background-color: #1877f2;
+            background-color: #3b82f6;
             color: #ffffff;
             border: none;
             padding: 8px 12px;
@@ -189,11 +187,10 @@
             font-size: 13px;
         }
 
-        /* Resultados de búsqueda sólidos */
         #search-results-container {
             display: none;
             position: absolute;
-            top: 50px;
+            top: 52px;
             left: 0;
             width: 100%;
             max-height: 180px;
@@ -225,13 +222,14 @@
             z-index: 50;
         }
 
+        /* Botones e inputs con colores de alto contraste */
         button, select, input[type="text"] {
             background-color: var(--button-bg);
             color: var(--button-text);
             border: none;
-            padding: 5px 8px;
+            padding: 6px 10px;
             border-radius: 6px;
-            font-weight: 600;
+            font-weight: bold;
             font-size: 11px;
             cursor: pointer;
         }
@@ -244,9 +242,8 @@
         }
 
         select {
-            background-color: var(--bg-color);
-            color: var(--text-color);
-            border: 1px solid var(--border-color);
+            background-color: var(--button-bg);
+            color: var(--button-text);
         }
 
         #loading {
@@ -278,15 +275,15 @@
     <div id="reader-view" class="view-screen">
         <div id="header">
             <button onclick="irABiblioteca()">⬅ Biblio</button>
-            <div style="display: flex; align-items: center; gap: 2px;">
-                <span style="font-size: 9px;">Zoom:</span>
-                <input type="range" id="zoom-range" min="50" max="200" value="100" style="width: 50px;" oninput="aplicarZoomManual(this.value)">
+            <div style="display: flex; align-items: center; gap: 3px;">
+                <span style="font-size: 10px; font-weight: bold;">Zoom:</span>
+                <input type="range" id="zoom-range" min="50" max="250" value="100" style="width: 55px;" oninput="aplicarZoomManual(this.value)">
             </div>
-            <div style="display: flex; align-items: center; gap: 2px;">
-                <input type="text" id="search-input" placeholder="Buscar..." style="width: 65px;" onkeypress="if(event.key === 'Enter') ejecutarBusqueda()">
+            <div style="display: flex; align-items: center; gap: 3px;">
+                <input type="text" id="search-input" placeholder="Buscar..." style="width: 70px;" onkeypress="if(event.key === 'Enter') ejecutarBusqueda()">
                 <button onclick="ejecutarBusqueda()">🔍</button>
             </div>
-            <div style="display: flex; gap: 3px; align-items: center;">
+            <div style="display: flex; gap: 4px; align-items: center;">
                 <button onclick="irANotas()">📝</button>
                 <select id="theme-selector" onchange="cambiarTema(this.value)">
                     <option value="day">☀️</option>
@@ -437,7 +434,7 @@
             if (epubRendition) {
                 const themes = {
                     day: { body: { background: "#ffffff", color: "#111111" } },
-                    night: { body: { background: "#18191a", color: "#e4e6eb" } },
+                    night: { body: { background: "#121212", color: "#f0f0f0" } },
                     ebook: { body: { background: "#fbf0d9", color: "#4a3b2c" } }
                 };
                 epubRendition.themes.register("custom", themes[themeName]);
@@ -565,8 +562,8 @@
             document.getElementById('epub-viewer').innerHTML = "";
 
             epubBook = ePub(url);
-            // Volvemos al modo paginado clásico (por hojas) para que funcione el porcentaje y la separación por páginas
-            epubRendition = epubBook.renderTo("epub-viewer", { width: "100%", height: "100%", flow: "paginated" });
+            // Modo scrolled continuo para permitir zoom y movimiento en todas las direcciones
+            epubRendition = epubBook.renderTo("epub-viewer", { width: "100%", height: "100%", flow: "scrolled" });
             
             epubRendition.display(posCfi || undefined).then(() => {
                 cambiarTema(document.getElementById('theme-selector').value);
@@ -578,11 +575,17 @@
                 }
             });
 
-            epubRendition.on("relocated", (location) => {
-                const percent = epubBook.locations.percentageFromCfi(location.start.cfi);
-                document.getElementById('page-info').innerText = Math.round(percent * 100) + '%';
-                guardarProgresoEnNube(location.start.cfi);
-            });
+            // Cálculo preciso del porcentaje de lectura basado en el desplazamiento vertical (scroll)
+            const viewerContainer = document.getElementById('viewer-container');
+            viewerContainer.onscroll = () => {
+                const scrollTop = viewerContainer.scrollTop;
+                const scrollHeight = viewerContainer.scrollHeight - viewerContainer.clientHeight;
+                if (scrollHeight > 0) {
+                    const percent = Math.round((scrollTop / scrollHeight) * 100);
+                    document.getElementById('page-info').innerText = percent + '%';
+                    guardarProgresoEnNube(scrollTop);
+                }
+            };
 
             epubRendition.on("selected", (cfiRange, contents) => {
                 cfiRangeActual = cfiRange;
@@ -605,7 +608,6 @@
 
             document.getElementById('prev-btn').onclick = () => epubRendition.prev();
             document.getElementById('next-btn').onclick = () => epubRendition.next();
-            epubBook.locations.generate(1024);
         }
 
         async function initPdf(url, pageNumInit) {
