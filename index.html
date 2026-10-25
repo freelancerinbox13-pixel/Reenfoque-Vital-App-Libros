@@ -113,9 +113,9 @@
         const tg = window.Telegram.WebApp;
         tg.expand();
 
-        // Configuración de Supabase (Reemplaza con tus credenciales)
-        const SUPABASE_URL = 'TU_SUPABASE_URL';
-        const SUPABASE_ANON_KEY = 'TU_SUPABASE_ANON_KEY';
+        // Configuración de Supabase con tus credenciales integradas
+        const SUPABASE_URL = 'https://augjyfnnzserfdoekkrp.supabase.co';
+        const SUPABASE_ANON_KEY = 'sb_publishable_ed7WzU7SyteyxrAk5qE44w_N2vslpMU';
         const supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
         let book = null;
@@ -213,7 +213,6 @@
                 alert("Por favor, selecciona texto en la página primero.");
                 return;
             }
-            // Simulación de traducción rápida
             const traduccion = `[Traducido]: ${seleccion}`;
             notasGuardadas.push({ tipo: 'Traducción', texto: traduccion, fecha: new Date().toLocaleDateString() });
             localStorage.setItem('reader_notes', JSON.stringify(notasGuardadas));
