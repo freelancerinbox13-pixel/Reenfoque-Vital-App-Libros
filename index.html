@@ -20,8 +20,8 @@
         :root.theme-day {
             --bg-color: #ffffff;
             --text-color: #222222;
-            --header-bg: #f0f0f0;
-            --border-color: #d0d0d0;
+            --header-bg: #e6e6e6;
+            --border-color: #cccccc;
             --button-bg: #3390ec;
             --button-text: #ffffff;
         }
@@ -29,7 +29,7 @@
         :root.theme-night {
             --bg-color: #181818;
             --text-color: #e0e0e0;
-            --header-bg: #222222;
+            --header-bg: #2b2b2b;
             --border-color: #444444;
             --button-bg: #2b5278;
             --button-text: #ffffff;
@@ -56,7 +56,6 @@
             transition: background-color 0.3s, color 0.3s;
         }
 
-        /* Vistas Principales */
         .view-screen {
             display: none;
             flex-direction: column;
@@ -95,7 +94,6 @@
             background: #ccc;
         }
 
-        /* Barra Superior Clara y Visible */
         #header {
             padding: 8px 12px;
             font-size: 13px;
@@ -162,26 +160,26 @@
             box-sizing: border-box;
         }
 
-        /* Menú Flotante de Selección */
+        /* Menú Flotante Sólido y Visible */
         #selection-menu {
             position: fixed;
             display: none;
-            background: var(--header-bg);
-            border: 1px solid var(--border-color);
-            padding: 6px;
-            border-radius: 20px;
-            box-shadow: 0 4px 12px rgba(0,0,0,0.3);
-            z-index: 5000;
+            background-color: #222222;
+            border: 1px solid #555555;
+            padding: 8px;
+            border-radius: 12px;
+            box-shadow: 0 6px 16px rgba(0,0,0,0.5);
+            z-index: 99999;
             gap: 6px;
         }
 
         .floating-btn {
-            background-color: var(--button-bg);
-            color: var(--button-text);
+            background-color: #3390ec;
+            color: #ffffff;
             border: none;
-            padding: 6px 12px;
-            border-radius: 15px;
-            font-size: 12px;
+            padding: 8px 14px;
+            border-radius: 8px;
+            font-size: 13px;
             cursor: pointer;
             font-weight: 600;
         }
@@ -195,17 +193,16 @@
             font-size: 13px;
         }
 
-        /* Modales */
         #search-modal {
             position: absolute;
             top: 50px;
             right: 10px;
             width: 280px;
-            background: var(--header-bg);
+            background-color: var(--bg-color);
             border: 1px solid var(--border-color);
             border-radius: 8px;
             padding: 12px;
-            box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+            box-shadow: 0 4px 12px rgba(0,0,0,0.3);
             display: none;
             z-index: 2000;
         }
@@ -227,16 +224,15 @@
             font-size: 12px;
         }
 
-        /* Vista Zoom Independiente */
         #zoom-modal {
             position: fixed;
             top: 0;
             left: 0;
             width: 100vw;
             height: 100vh;
-            background: var(--bg-color);
+            background-color: var(--bg-color);
             color: var(--text-color);
-            z-index: 6000;
+            z-index: 999999;
             padding: 24px;
             box-sizing: border-box;
             display: none;
@@ -245,11 +241,14 @@
         }
 
         #zoom-content {
-            font-size: 22px;
+            font-size: 26px;
             line-height: 1.8;
             overflow-y: auto;
             flex: 1;
             margin-bottom: 20px;
+            padding: 10px;
+            background: var(--header-bg);
+            border-radius: 8px;
         }
 
         #nav-controls {
@@ -310,7 +309,7 @@
     <div id="reader-view" class="view-screen">
         <div id="header">
             <button onclick="irABiblioteca()">⬅ Biblioteca</button>
-            <span id="book-title" style="overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 120px;">Lector</span>
+            <span id="book-title" style="overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 110px;">Lector</span>
             <div id="toolbar">
                 <button onclick="toggleModal('search-modal')">🔍 Lupa</button>
                 <button onclick="irANotas()">📝 Notas</button>
@@ -361,9 +360,9 @@
 
     <!-- 4. VISTA ZOOM PANTALLA COMPLETA -->
     <div id="zoom-modal">
-        <div style="font-weight:bold; font-size:14px; margin-bottom:10px;">🔍 Vista Ampliada (Zoom)</div>
+        <div style="font-weight:bold; font-size:16px; margin-bottom:10px;">🔍 Vista Ampliada (Zoom)</div>
         <div id="zoom-content"></div>
-        <button onclick="cerrarZoom()" style="padding: 12px; font-size:14px;">Cerrar Zoom</button>
+        <button onclick="cerrarZoom()" style="padding: 14px; font-size:15px; background-color:#3390ec; color:#fff; border-radius:8px;">Cerrar Zoom</button>
     </div>
 
     <script>
@@ -400,7 +399,6 @@
                     const card = document.createElement('div');
                     card.className = 'book-card';
                     
-                    // Intentar extraer la portada del EPUB
                     let coverImgUrl = "";
                     try {
                         const tempBook = ePub(libro.epub_url);
@@ -550,28 +548,6 @@
             cargarNotasGuardadas();
         }
 
-        document.addEventListener('mouseup', mostrarMenuFlotante);
-        document.addEventListener('touchend', mostrarMenuFlotante);
-
-        function mostrarMenuFlotante(e) {
-            setTimeout(() => {
-                const selection = window.getSelection();
-                const menu = document.getElementById('selection-menu');
-                if (selection && selection.toString().trim().length > 0) {
-                    textoSeleccionadoActual = selection.toString();
-                    const range = selection.getRangeAt(0);
-                    const rect = range.getBoundingClientRect();
-                    menu.style.top = `${Math.max(10, rect.top - 55 + window.scrollY)}px`;
-                    menu.style.left = `${Math.max(10, rect.left)}px`;
-                    menu.style.display = 'flex';
-                } else {
-                    if (e.target && e.target.closest('#selection-menu') === null) {
-                        menu.style.display = 'none';
-                    }
-                }
-            }, 100);
-        }
-
         async function ejecutarBusqueda() {
             const query = document.getElementById('search-input').value.trim();
             const resultsContainer = document.getElementById('search-results');
@@ -633,15 +609,16 @@
                 guardarProgresoEnNube(location.start.cfi);
             });
 
+            // Capturar la selección dentro del iframe de EPUB y mostrar menú sólido
             epubRendition.on("selected", (cfiRange, contents) => {
                 cfiRangeActual = cfiRange;
                 textoSeleccionadoActual = contents.window.getSelection().toString();
                 const menu = document.getElementById('selection-menu');
                 const selection = contents.window.getSelection();
-                if (selection.rangeCount > 0) {
+                if (selection.rangeCount > 0 && textoSeleccionadoActual.trim().length > 0) {
                     const range = selection.getRangeAt(0);
                     const rect = range.getBoundingClientRect();
-                    menu.style.top = `${Math.max(10, rect.top - 55)}px`;
+                    menu.style.top = `${Math.max(10, rect.top - 60)}px`;
                     menu.style.left = `${Math.max(10, rect.left)}px`;
                     menu.style.display = 'flex';
                 }
@@ -690,7 +667,7 @@
             document.getElementById('loading').style.display = show ? 'block' : 'none';
         }
 
-        window.load = cargarBiblioteca();
+        window.addEventListener('load', cargarBiblioteca);
     </script>
 </body>
 </html>
