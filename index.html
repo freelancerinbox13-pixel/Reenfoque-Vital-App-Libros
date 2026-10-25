@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Lector Pro Supabase - Telegram Mini App</title>
+    <title>Lector Pro - Telegram Mini App</title>
     
     <!-- SDK de Telegram WebApp -->
     <script src="https://telegram.org/js/telegram-web-app.js"></script>
@@ -20,8 +20,8 @@
         :root.theme-day {
             --bg-color: #ffffff;
             --text-color: #222222;
-            --header-bg: #f5f5f5;
-            --border-color: #e0e0e0;
+            --header-bg: #f0f0f0;
+            --border-color: #d0d0d0;
             --button-bg: #3390ec;
             --button-text: #ffffff;
         }
@@ -30,7 +30,7 @@
             --bg-color: #181818;
             --text-color: #e0e0e0;
             --header-bg: #222222;
-            --border-color: #333333;
+            --border-color: #444444;
             --button-bg: #2b5278;
             --button-text: #ffffff;
         }
@@ -56,16 +56,20 @@
             transition: background-color 0.3s, color 0.3s;
         }
 
-        #library-view {
+        /* Vistas Principales */
+        .view-screen {
+            display: none;
+            flex-direction: column;
             width: 100%;
-            height: calc(100vh - 50px);
-            padding: 16px;
-            overflow-y: auto;
+            height: 100vh;
             box-sizing: border-box;
-            display: block;
         }
 
-        .library-title {
+        #library-view { display: flex; padding: 16px; overflow-y: auto; }
+        #reader-view { display: none; }
+        #notes-view { display: none; padding: 16px; overflow-y: auto; }
+
+        .library-title, .notes-title {
             font-size: 18px;
             font-weight: bold;
             margin-bottom: 12px;
@@ -79,27 +83,30 @@
             margin-bottom: 10px;
             cursor: pointer;
             display: flex;
-            justify-content: space-between;
             align-items: center;
+            gap: 12px;
         }
 
-        #reader-view {
-            display: none;
-            flex-direction: column;
-            width: 100%;
-            height: 100vh;
+        .book-card img {
+            width: 45px;
+            height: 60px;
+            object-fit: cover;
+            border-radius: 4px;
+            background: #ccc;
         }
 
+        /* Barra Superior Clara y Visible */
         #header {
-            padding: 8px 16px;
+            padding: 8px 12px;
             font-size: 13px;
             font-weight: 600;
             background-color: var(--header-bg);
             border-bottom: 1px solid var(--border-color);
+            color: var(--text-color);
             display: flex;
             justify-content: space-between;
             align-items: center;
-            height: 40px;
+            height: 45px;
             box-sizing: border-box;
             z-index: 10;
         }
@@ -110,12 +117,11 @@
             align-items: center;
         }
 
-        /* Contenedor estricto para evitar pantalla gris */
         #viewer-container {
             flex: 1;
             position: relative;
             width: 100%;
-            height: calc(100vh - 90px);
+            height: calc(100vh - 95px);
             overflow: hidden;
         }
 
@@ -156,6 +162,7 @@
             box-sizing: border-box;
         }
 
+        /* Menú Flotante de Selección */
         #selection-menu {
             position: fixed;
             display: none;
@@ -179,53 +186,19 @@
             font-weight: 600;
         }
 
-        #notes-sidebar {
-            position: absolute;
-            top: 0;
-            right: -320px;
-            width: 300px;
-            height: 100%;
-            background: var(--header-bg);
-            border-left: 1px solid var(--border-color);
-            box-shadow: -4px 0 12px rgba(0,0,0,0.15);
-            z-index: 3000;
-            transition: right 0.3s ease;
-            display: flex;
-            flex-direction: column;
-            padding: 16px;
-            box-sizing: border-box;
-        }
-
-        #notes-sidebar.open {
-            right: 0;
-        }
-
-        .sidebar-header {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            font-weight: bold;
-            margin-bottom: 12px;
-            font-size: 14px;
-        }
-
-        #notes-list {
-            flex: 1;
-            overflow-y: auto;
-            font-size: 12px;
-        }
-
         .item-row {
-            padding: 8px;
+            padding: 10px;
             border-bottom: 1px solid var(--border-color);
-            margin-bottom: 6px;
-            background: var(--bg-color);
-            border-radius: 4px;
+            margin-bottom: 8px;
+            background: var(--header-bg);
+            border-radius: 6px;
+            font-size: 13px;
         }
 
+        /* Modales */
         #search-modal {
             position: absolute;
-            top: 45px;
+            top: 50px;
             right: 10px;
             width: 280px;
             background: var(--header-bg);
@@ -254,6 +227,7 @@
             font-size: 12px;
         }
 
+        /* Vista Zoom Independiente */
         #zoom-modal {
             position: fixed;
             top: 0;
@@ -261,6 +235,7 @@
             width: 100vw;
             height: 100vh;
             background: var(--bg-color);
+            color: var(--text-color);
             z-index: 6000;
             padding: 24px;
             box-sizing: border-box;
@@ -270,7 +245,7 @@
         }
 
         #zoom-content {
-            font-size: 24px;
+            font-size: 22px;
             line-height: 1.8;
             overflow-y: auto;
             flex: 1;
@@ -325,22 +300,24 @@
 
     <div id="loading">Cargando...</div>
 
-    <div id="library-view">
+    <!-- 1. VISTA BIBLIOTECA -->
+    <div id="library-view" class="view-screen" style="display: flex;">
         <div class="library-title">📚 Mi Biblioteca en la Nube</div>
-        <div id="books-list">Cargando libros desde Supabase...</div>
+        <div id="books-list">Cargando libros...</div>
     </div>
 
-    <div id="reader-view">
+    <!-- 2. VISTA LECTOR -->
+    <div id="reader-view" class="view-screen">
         <div id="header">
-            <button onclick="volverABiblioteca()">⬅ Biblioteca</button>
-            <span id="book-title">Lector</span>
+            <button onclick="irABiblioteca()">⬅ Biblioteca</button>
+            <span id="book-title" style="overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 120px;">Lector</span>
             <div id="toolbar">
-                <button onclick="toggleModal('search-modal')">🔍</button>
-                <button onclick="toggleSidebar()">📝 Notas</button>
+                <button onclick="toggleModal('search-modal')">🔍 Lupa</button>
+                <button onclick="irANotas()">📝 Notas</button>
                 <select id="theme-selector" onchange="cambiarTema(this.value)">
-                    <option value="day">☀️</option>
-                    <option value="night">🌙</option>
-                    <option value="ebook">📖</option>
+                    <option value="day">☀️ Día</option>
+                    <option value="night">🌙 Noche</option>
+                    <option value="ebook">📖 Ebook</option>
                 </select>
             </div>
         </div>
@@ -361,14 +338,6 @@
                 <button onclick="ejecutarBusqueda()" style="width: 100%;">Buscar</button>
                 <div id="search-results" style="margin-top: 8px;"></div>
             </div>
-
-            <div id="notes-sidebar">
-                <div class="sidebar-header">
-                    <span>📝 Mis Notas y Traducciones</span>
-                    <button onclick="toggleSidebar()" style="background:none; color:var(--text-color); font-size:16px; padding:0;">✕</button>
-                </div>
-                <div id="notes-list">Sin elementos guardados.</div>
-            </div>
         </div>
 
         <div id="nav-controls">
@@ -378,8 +347,21 @@
         </div>
     </div>
 
+    <!-- 3. VISTA DE NOTAS INDEPENDIENTE -->
+    <div id="notes-view" class="view-screen">
+        <div id="header">
+            <button onclick="irALector()">⬅ Volver al Libro</button>
+            <span>📝 Notas y Traducciones</span>
+            <div></div>
+        </div>
+        <div style="padding: 16px; flex: 1; overflow-y: auto;">
+            <div id="notes-list">Sin notas guardadas.</div>
+        </div>
+    </div>
+
+    <!-- 4. VISTA ZOOM PANTALLA COMPLETA -->
     <div id="zoom-modal">
-        <div style="font-weight:bold; font-size:14px; margin-bottom:10px;">🔍 Vista Ampliada (Zoom de Párrafo)</div>
+        <div style="font-weight:bold; font-size:14px; margin-bottom:10px;">🔍 Vista Ampliada (Zoom)</div>
         <div id="zoom-content"></div>
         <button onclick="cerrarZoom()" style="padding: 12px; font-size:14px;">Cerrar Zoom</button>
     </div>
@@ -414,13 +396,28 @@
                     return;
                 }
 
-                data.forEach(libro => {
+                for (const libro of data) {
                     const card = document.createElement('div');
                     card.className = 'book-card';
-                    card.innerHTML = `<span>📖 ${libro.titulo}</span> <button>Leer</button>`;
+                    
+                    // Intentar extraer la portada del EPUB
+                    let coverImgUrl = "";
+                    try {
+                        const tempBook = ePub(libro.epub_url);
+                        const coverUrl = await tempBook.coverUrl();
+                        if (coverUrl) coverImgUrl = coverUrl;
+                    } catch(e) { console.log("Sin portada"); }
+
+                    card.innerHTML = `
+                        <img src="${coverImgUrl || 'https://via.placeholder.com/45x60?text=EPUB'}" alt="Portada">
+                        <div style="flex: 1;">
+                            <div style="font-weight:600; font-size:14px;">${libro.titulo}</div>
+                        </div>
+                        <button>Leer</button>
+                    `;
                     card.onclick = () => abrirLibro(libro);
                     listContainer.appendChild(card);
-                });
+                }
                 showLoading(false);
             } catch (err) {
                 console.error(err);
@@ -431,8 +428,7 @@
 
         async function abrirLibro(libro) {
             libroActualId = libro.id;
-            document.getElementById('library-view').style.display = 'none';
-            document.getElementById('reader-view').style.display = 'flex';
+            cambiarVista('reader-view');
             document.getElementById('book-title').innerText = libro.titulo;
 
             const extension = libro.epub_url.split('.').pop().toLowerCase().split('?')[0];
@@ -454,11 +450,14 @@
             showLoading(false);
         }
 
-        function volverABiblioteca() {
-            document.getElementById('reader-view').style.display = 'none';
-            document.getElementById('library-view').style.display = 'block';
-            cargarBiblioteca();
+        function cambiarVista(vistaId) {
+            document.querySelectorAll('.view-screen').forEach(el => el.style.display = 'none');
+            document.getElementById(vistaId).style.display = 'flex';
         }
+
+        function irABiblioteca() { cambiarVista('library-view'); cargarBiblioteca(); }
+        function irANotas() { cambiarVista('notes-view'); cargarNotasGuardadas(); }
+        function irALector() { cambiarVista('reader-view'); }
 
         async function guardarProgresoEnNube(posicion) {
             if (!libroActualId) return;
@@ -485,13 +484,6 @@
             modal.style.display = modal.style.display === 'block' ? 'none' : 'block';
         }
 
-        function toggleSidebar() {
-            const sidebar = document.getElementById('notes-sidebar');
-            sidebar.classList.toggle('open');
-            if (sidebar.classList.contains('open')) cargarNotasGuardadas();
-            setTimeout(() => { if (epubRendition) epubRendition.resize(); }, 300);
-        }
-
         function abrirZoom(texto) {
             if (!texto) return;
             document.getElementById('zoom-content').innerText = texto;
@@ -514,11 +506,10 @@
                 destacados.push(`🌐 [Traducción]: ${textoSeleccionadoActual} ➔ ${traduccion}`);
                 localStorage.setItem(`destacados_${libroActualId}`, JSON.stringify(destacados));
 
-                alert(`Traducción: ${traduccion}`);
+                alert(`Traducción guardada en Notas.`);
                 document.getElementById('selection-menu').style.display = 'none';
-                cargarNotasGuardadas();
             } catch (err) {
-                alert("Error al conectar con el servicio de traducción.");
+                alert("Error al traducir.");
             }
         }
 
@@ -534,14 +525,13 @@
 
             alert("¡Párrafo destacado guardado!");
             document.getElementById('selection-menu').style.display = 'none';
-            cargarNotasGuardadas();
         }
 
         function cargarNotasGuardadas() {
             const container = document.getElementById('notes-list');
             let destacados = JSON.parse(localStorage.getItem(`destacados_${libroActualId}`) || '[]');
             if (destacados.length === 0) {
-                container.innerHTML = "Sin notas guardadas.";
+                container.innerHTML = "Sin notas guardadas para este libro.";
                 return;
             }
             container.innerHTML = "";
@@ -571,7 +561,7 @@
                     textoSeleccionadoActual = selection.toString();
                     const range = selection.getRangeAt(0);
                     const rect = range.getBoundingClientRect();
-                    menu.style.top = `${rect.top - 55 + window.scrollY}px`;
+                    menu.style.top = `${Math.max(10, rect.top - 55 + window.scrollY)}px`;
                     menu.style.left = `${Math.max(10, rect.left)}px`;
                     menu.style.display = 'flex';
                 } else {
@@ -587,10 +577,7 @@
             const resultsContainer = document.getElementById('search-results');
             resultsContainer.innerHTML = "Buscando...";
 
-            if (!query) {
-                resultsContainer.innerHTML = "Escribe una palabra.";
-                return;
-            }
+            if (!query) { resultsContainer.innerHTML = "Escribe una palabra."; return; }
 
             if (epubBook) {
                 resultsContainer.innerHTML = "";
@@ -631,7 +618,7 @@
             document.getElementById('pdf-viewer').style.display = 'none';
             document.getElementById('txt-viewer').style.display = 'none';
 
-            document.getElementById('epub-viewer').innerHTML = ""; // Limpiar visor previo
+            document.getElementById('epub-viewer').innerHTML = "";
 
             epubBook = ePub(url);
             epubRendition = epubBook.renderTo("epub-viewer", { width: "100%", height: "100%" });
@@ -654,7 +641,7 @@
                 if (selection.rangeCount > 0) {
                     const range = selection.getRangeAt(0);
                     const rect = range.getBoundingClientRect();
-                    menu.style.top = `${rect.top - 55}px`;
+                    menu.style.top = `${Math.max(10, rect.top - 55)}px`;
                     menu.style.left = `${Math.max(10, rect.left)}px`;
                     menu.style.display = 'flex';
                 }
@@ -662,7 +649,6 @@
 
             document.getElementById('prev-btn').onclick = () => epubRendition.prev();
             document.getElementById('next-btn').onclick = () => epubRendition.next();
-            
             epubBook.locations.generate(1024);
         }
 
@@ -704,7 +690,7 @@
             document.getElementById('loading').style.display = show ? 'block' : 'none';
         }
 
-        window.addEventListener('load', cargarBiblioteca);
+        window.load = cargarBiblioteca();
     </script>
 </body>
 </html>
