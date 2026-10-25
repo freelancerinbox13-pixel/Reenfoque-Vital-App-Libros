@@ -95,10 +95,10 @@
             background: #ccc;
         }
 
-        /* Barra superior completamente sólida e independiente */
+        /* Menú superior totalmente sólido, visible y adaptado a móviles */
         #header {
-            padding: 6px 10px;
-            font-size: 12px;
+            padding: 4px 8px;
+            font-size: 11px;
             font-weight: 600;
             background-color: var(--header-bg);
             border-bottom: 2px solid var(--border-color);
@@ -106,14 +106,15 @@
             display: flex;
             justify-content: space-between;
             align-items: center;
-            height: 52px;
+            height: 55px;
             box-sizing: border-box;
             z-index: 50;
+            overflow-x: auto;
         }
 
         #toolbar {
             display: flex;
-            gap: 4px;
+            gap: 3px;
             align-items: center;
         }
 
@@ -121,7 +122,7 @@
             flex: 1;
             position: relative;
             width: 100%;
-            height: calc(100vh - 102px);
+            height: calc(100vh - 105px);
             overflow: auto;
         }
 
@@ -193,30 +194,21 @@
             font-size: 13px;
         }
 
-        /* Modal de Búsqueda totalmente sólido y seguro */
-        #search-modal {
+        /* Resultados de Búsqueda integrados debajo del menú o panel independiente */
+        #search-results-container {
+            display: none;
             position: absolute;
             top: 55px;
-            right: 10px;
-            width: 280px;
+            left: 0;
+            width: 100%;
+            max-height: 200px;
             background-color: var(--bg-color);
-            border: 2px solid var(--border-color);
-            border-radius: 8px;
-            padding: 14px;
-            box-shadow: 0 8px 24px rgba(0,0,0,0.5);
-            display: none;
+            border-bottom: 2px solid var(--border-color);
+            box-shadow: 0 8px 16px rgba(0,0,0,0.4);
             z-index: 2000;
-        }
-
-        #search-modal input {
-            width: calc(100% - 14px);
-            padding: 8px;
-            margin-bottom: 8px;
-            border: 1px solid var(--border-color);
-            border-radius: 4px;
-            background: var(--bg-color);
-            color: var(--text-color);
-            font-size: 14px;
+            overflow-y: auto;
+            padding: 10px;
+            box-sizing: border-box;
         }
 
         .search-result-item {
@@ -238,15 +230,22 @@
             z-index: 50;
         }
 
-        button, select {
+        button, select, input[type="text"] {
             background-color: var(--button-bg);
             color: var(--button-text);
             border: none;
-            padding: 6px 10px;
+            padding: 5px 8px;
             border-radius: 6px;
             font-weight: 600;
             font-size: 11px;
             cursor: pointer;
+        }
+
+        input[type="text"] {
+            background-color: var(--bg-color);
+            color: var(--text-color);
+            border: 1px solid var(--border-color);
+            cursor: text;
         }
 
         select {
@@ -284,12 +283,15 @@
     <div id="reader-view" class="view-screen">
         <div id="header">
             <button onclick="irABiblioteca()">⬅ Biblio</button>
-            <div style="display: flex; align-items: center; gap: 4px;">
-                <span style="font-size: 10px;">Zoom:</span>
-                <input type="range" id="zoom-range" min="50" max="200" value="100" style="width: 65px;" oninput="aplicarZoomManual(this.value)">
+            <div style="display: flex; align-items: center; gap: 2px;">
+                <span style="font-size: 9px;">Zoom:</span>
+                <input type="range" id="zoom-range" min="50" max="200" value="100" style="width: 55px;" oninput="aplicarZoomManual(this.value)">
+            </div>
+            <div style="display: flex; align-items: center; gap: 2px;">
+                <input type="text" id="search-input" placeholder="Buscar..." style="width: 75px;" onkeypress="if(event.key === 'Enter') ejecutarBusqueda()">
+                <button onclick="ejecutarBusqueda()">🔍</button>
             </div>
             <div id="toolbar">
-                <button onclick="toggleModal('search-modal')">🔍</button>
                 <button onclick="irANotas()">📝</button>
                 <select id="theme-selector" onchange="cambiarTema(this.value)">
                     <option value="day">☀️</option>
@@ -297,6 +299,15 @@
                     <option value="ebook">📖</option>
                 </select>
             </div>
+        </div>
+
+        <!-- Contenedor de resultados de búsqueda integrado justo debajo del menú -->
+        <div id="search-results-container">
+            <div style="display: flex; justify-content: space-between; font-weight: bold; margin-bottom: 5px;">
+                <span>Resultados de búsqueda</span>
+                <button onclick="cerrarBusqueda()" style="background: red; padding: 2px 6px;">✕</button>
+            </div>
+            <div id="search-results">Escribe una palabra y presiona buscar.</div>
         </div>
         
         <div id="viewer-container">
@@ -307,12 +318,6 @@
             <div id="selection-menu">
                 <button class="floating-btn" onclick="guardarDestacado()">✨ Destacar</button>
                 <button class="floating-btn" onclick="traducirTextoSelection()">🌐 Traducir</button>
-            </div>
-
-            <div id="search-modal" class="modal">
-                <input type="text" id="search-input" placeholder="Buscar palabra..." onkeypress="if(event.key === 'Enter') ejecutarBusqueda()">
-                <button onclick="ejecutarBusqueda()" style="width: 100%;">Buscar</button>
-                <div id="search-results" style="margin-top: 8px; max-height: 150px; overflow-y: auto;"></div>
             </div>
         </div>
 
@@ -446,11 +451,6 @@
             }
         }
 
-        function toggleModal(modalId) {
-            const modal = document.getElementById(modalId);
-            modal.style.display = modal.style.display === 'block' ? 'none' : 'block';
-        }
-
         function aplicarZoomManual(valor) {
             if (epubRendition) {
                 epubRendition.themes.fontSize(valor + "%");
@@ -515,9 +515,15 @@
         async function ejecutarBusqueda() {
             const query = document.getElementById('search-input').value.trim();
             const resultsContainer = document.getElementById('search-results');
+            const resultsBox = document.getElementById('search-results-container');
+            
+            resultsBox.style.display = 'block';
             resultsContainer.innerHTML = "Buscando...";
 
-            if (!query) { resultsContainer.innerHTML = "Escribe una palabra."; return; }
+            if (!query) { 
+                resultsContainer.innerHTML = "Escribe una palabra para buscar."; 
+                return; 
+            }
 
             if (epubBook) {
                 resultsContainer.innerHTML = "";
@@ -544,13 +550,17 @@
                     div.innerText = match.excerpt;
                     div.onclick = () => {
                         epubRendition.display(match.cfi);
-                        toggleModal('search-modal');
+                        cerrarBusqueda();
                     };
                     resultsContainer.appendChild(div);
                 });
             } else {
                 resultsContainer.innerHTML = "Búsqueda disponible en EPUB.";
             }
+        }
+
+        function cerrarBusqueda() {
+            document.getElementById('search-results-container').style.display = 'none';
         }
 
         function initEpub(url, posCfi) {
@@ -567,7 +577,6 @@
                 cambiarTema(document.getElementById('theme-selector').value);
             });
 
-            // Solución de rotación y adaptación de pantalla al girar el dispositivo
             window.addEventListener('resize', () => {
                 if (epubRendition) {
                     epubRendition.resize();
@@ -589,8 +598,8 @@
                     const range = selection.getRangeAt(0);
                     const rect = range.getBoundingClientRect();
                     
-                    let posX = Math.max(10, Math.min(rect.left, window.innerWidth - 200));
-                    let posY = rect.top - 60;
+                    let posX = Math.max(10, Math.min(rect.left, window.innerWidth - 180));
+                    let posY = rect.top - 55;
                     if (posY < 60) posY = rect.bottom + 10;
 
                     menu.style.top = `${posY}px`;
@@ -618,7 +627,7 @@
             document.getElementById('next-btn').onclick = () => { if (pageNum < pdfDoc.numPages) { pageNum++; renderPage(pageNum); guardarProgresoEnNube(pageNum); } };
         }
 
-        async	 function renderPage(num) {
+        async function renderPage(num) {
             const page = await pdfDoc.getPage(num);
             const canvas = document.getElementById('pdf-canvas');
             const ctx = canvas.getContext('2d');
