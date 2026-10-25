@@ -66,9 +66,47 @@
         canvas { max-width: 100%; height: auto !important; box-shadow: 0 4px 8px rgba(0,0,0,0.1); }
         .reader-toolbar { display: flex; justify-content: space-between; align-items: center; padding: 10px 16px; background: var(--card-bg); font-size: 13px; z-index: 10; }
         .nota-item { background: var(--card-bg); padding: 10px; border-radius: 6px; margin-bottom: 8px; font-size: 13px; border-left: 4px solid var(--accent-color); }
+
+        /* Estilo para el menú flotante de selección */
+        #menu-flotante {
+            display: none;
+            position: absolute;
+            background: #222;
+            color: #fff;
+            padding: 6px 10px;
+            border-radius: 8px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+            z-index: 1000;
+            gap: 6px;
+            align-items: center;
+        }
+        #menu-flotante button {
+            background: transparent;
+            border: none;
+            color: #fff;
+            font-size: 12px;
+            padding: 4px 8px;
+            cursor: pointer;
+            border-radius: 4px;
+        }
+        #menu-flotante button:hover {
+            background: rgba(255,255,255,0.2);
+        }
+        #menu-flotante button.btn-amarillo {
+            background: #ffeb3b;
+            color: #000;
+            font-weight: bold;
+        }
     </style>
 </head>
 <body>
+
+    <!-- Menú flotante interactivo -->
+    <div id="menu-flotante">
+        <button class="btn-amarillo" onclick="menuRemarcar()">Remarcar</button>
+        <button onclick="menuTraducir()">Traducir</button>
+        <button onclick="menuNota()">Nota</button>
+    </div>
 
     <header>
         <h2 id="titulo-app">Biblioteca</h2>
@@ -96,8 +134,6 @@
                     <option value="evook">Modo: E-book</option>
                 </select>
                 <button class="btn" onclick="toggleZoom()" id="btn-zoom">Zoom: Off</button>
-                <button class="btn" onclick="traducirTextoSeleccionado()">Traducir</button>
-                <button class="btn" onclick="guardarNotaActual()">Guardar Nota</button>
             </div>
             
             <div id="viewer-container">
@@ -137,21 +173,15 @@
         let pageNum = 1;
         let formatoActual = '';
         let urlActualGlobal = '';
-        let ultimoTextoSeleccionado = '';
-
-        // Capturar la selección de texto en tiempo real antes de que se pierda el foco
-        document.addEventListener('selectionchange', () => {
-            const sel = window.getSelection().toString().trim();
-            if (sel.length > 0) {
-                ultimoTextoSeleccionado = sel;
-            }
-        });
+        let textoSeleccionadoActual = '';
+        let epubRangeActual = null;
 
         function cambiarSeccion(seccion) {
             document.querySelectorAll('.seccion').forEach(s => s.classList.remove('activa'));
             document.getElementById(`seccion-${seccion}`).classList.add('activa');
             document.getElementById('titulo-app').innerText = seccion === 'biblioteca' ? 'Biblioteca' : seccion === 'lector' ? 'Lector' : 'Notas y Traducciones';
             if (seccion === 'notas') renderizarNotas();
+            ocultarMenuFlotante();
         }
 
         async function cargarBiblioteca() {
@@ -192,6 +222,7 @@
             cambiarSeccion('lector');
             const viewer = document.getElementById('viewer');
             viewer.innerHTML = '';
+            ocultarMenuFlotante();
 
             if (url.toLowerCase().includes('.pdf')) {
                 formatoActual = 'pdf';
@@ -216,6 +247,24 @@
                     localStorage.setItem('last_loc_' + url, location.start.cfi);
                 }
             });
+
+            // Evento nativo de selección en ePub.js
+            rendition.on("selected", (cfiRange, contents) => {
+                epubRangeActual = cfiRange;
+                textoSeleccionadoActual = contents.window.getSelection().toString().trim();
+                
+                if (textoSeleccionadoActual.length > 0) {
+                    try {
+                        const selection = contents.window.getSelection();
+                        const range = selection.getRangeAt(0);
+                        const rect = range.getBoundingClientRect();
+                        mostrarMenuFlotante(rect.left + 20, rect.top - 45);
+                    } catch (e) {
+                        mostrarMenuFlotante(100, 100);
+                    }
+                }
+            });
+
             book.locations.generate(1024);
         }
 
@@ -256,7 +305,79 @@
             });
         }
 
+        // Detector de selección general para PDF y textos web
+        document.addEventListener('mouseup', procesarSeleccionGeneral);
+        document.addEventListener('touchend', procesarSeleccionGeneral);
+
+        function procesarSeleccionGeneral(e) {
+            if (formatoActual === 'pdf') {
+                const sel = window.getSelection();
+                const texto = sel.toString().trim();
+                if (texto.length > 0) {
+                    textoSeleccionadoActual = texto;
+                    try {
+                        const range = sel.getRangeAt(0);
+                        const rect = range.getBoundingClientRect();
+                        mostrarMenuFlotante(rect.left, rect.top - 45);
+                    } catch (err) {
+                        mostrarMenuFlotante(50, 100);
+                    }
+                }
+            }
+        }
+
+        function mostrarMenuFlotante(x, y) {
+            const menu = document.getElementById('menu-flotante');
+            menu.style.left = `${Math.max(10, x)}px`;
+            menu.style.top = `${Math.max(10, y)}px`;
+            menu.style.display = 'flex';
+        }
+
+        function ocultarMenuFlotante() {
+            const menu = document.getElementById('menu-flotante');
+            menu.style.display = 'none';
+        }
+
+        // Acciones del menú flotante
+        function menuRemarcar() {
+            if (!textoSeleccionadoActual) {
+                alert("Ningún texto seleccionado.");
+                return;
+            }
+            if (formatoActual === 'epub' && rendition && epubRangeActual) {
+                // Resalta en amarillo directamente en ePub.js
+                rendition.annotations.highlight(epubRangeActual, {}, (e) => {}, "highlight", { fill: "yellow", "fill-opacity": "0.4" });
+            }
+            notasGuardadas.push({ tipo: 'Remarcado', texto: textoSeleccionadoActual, fecha: new Date().toLocaleDateString() });
+            localStorage.setItem('reader_notes', JSON.stringify(notasGuardadas));
+            ocultarMenuFlotante();
+            alert("Texto remarcado de amarillo y guardado.");
+        }
+
+        function menuTraducir() {
+            if (!textoSeleccionadoActual) {
+                alert("Ningún texto seleccionado.");
+                return;
+            }
+            notasGuardadas.push({ tipo: 'Traducción', texto: `[Traducido]: ${textoSeleccionadoActual}`, fecha: new Date().toLocaleDateString() });
+            localStorage.setItem('reader_notes', JSON.stringify(notasGuardadas));
+            ocultarMenuFlotante();
+            alert("Traducción guardada en Notas.");
+        }
+
+        function menuNota() {
+            if (!textoSeleccionadoActual) {
+                alert("Ningún texto seleccionado.");
+                return;
+            }
+            notasGuardadas.push({ tipo: 'Nota', texto: textoSeleccionadoActual, fecha: new Date().toLocaleDateString() });
+            localStorage.setItem('reader_notes', JSON.stringify(notasGuardadas));
+            ocultarMenuFlotante();
+            alert("Nota guardada correctamente.");
+        }
+
         function libroSiguiente() {
+            ocultarMenuFlotante();
             if (formatoActual === 'epub' && rendition) {
                 rendition.next();
             } else if (formatoActual === 'pdf' && pdfDoc) {
@@ -268,6 +389,7 @@
         }
 
         function libroAnterior() {
+            ocultarMenuFlotante();
             if (formatoActual === 'epub' && rendition) {
                 rendition.prev();
             } else if (formatoActual === 'pdf' && pdfDoc) {
@@ -303,31 +425,6 @@
                 container.classList.remove('zoom-activo');
                 btn.innerText = "Zoom: Off";
             }
-        }
-
-        // Funciones de traducción y notas utilizando la memoria en tiempo real de selección
-        function traducirTextoSeleccionado() {
-            let texto = ultimoTextoSeleccionado || window.getSelection().toString().trim();
-            if (!texto) {
-                texto = prompt("Introduce o pega el texto que deseas traducir:");
-                if (!texto) return;
-            }
-            notasGuardadas.push({ tipo: 'Traducción', texto: `[Traducido]: ${texto}`, fecha: new Date().toLocaleDateString() });
-            localStorage.setItem('reader_notes', JSON.stringify(notasGuardadas));
-            ultimoTextoSeleccionado = '';
-            alert("Traducción guardada en Notas.");
-        }
-
-        function guardarNotaActual() {
-            let texto = ultimoTextoSeleccionado || window.getSelection().toString().trim();
-            if (!texto) {
-                texto = prompt("Introduce o pega el párrafo o nota que deseas guardar:");
-                if (!texto) return;
-            }
-            notasGuardadas.push({ tipo: 'Nota', texto: texto, fecha: new Date().toLocaleDateString() });
-            localStorage.setItem('reader_notes', JSON.stringify(notasGuardadas));
-            ultimoTextoSeleccionado = '';
-            alert("Nota guardada correctamente.");
         }
 
         function renderizarNotas() {
