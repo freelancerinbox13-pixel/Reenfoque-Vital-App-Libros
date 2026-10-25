@@ -19,27 +19,27 @@
     <style>
         :root.theme-day {
             --bg-color: #ffffff;
-            --text-color: #222222;
-            --header-bg: #e6e6e6;
-            --border-color: #cccccc;
-            --button-bg: #3390ec;
+            --text-color: #111111;
+            --header-bg: #e4e6eb;
+            --border-color: #bcc0c4;
+            --button-bg: #1877f2;
             --button-text: #ffffff;
         }
 
         :root.theme-night {
-            --bg-color: #181818;
-            --text-color: #e0e0e0;
-            --header-bg: #2b2b2b;
-            --border-color: #444444;
-            --button-bg: #2b5278;
+            --bg-color: #18191a;
+            --text-color: #e4e6eb;
+            --header-bg: #242526;
+            --border-color: #393a3b;
+            --button-bg: #2d88ff;
             --button-text: #ffffff;
         }
 
         :root.theme-ebook {
             --bg-color: #fbf0d9;
-            --text-color: #5f4b32;
-            --header-bg: #f1e2c8;
-            --border-color: #dfceb2;
+            --text-color: #4a3b2c;
+            --header-bg: #edd5b1;
+            --border-color: #d4bc97;
             --button-bg: #8c6d48;
             --button-text: #ffffff;
         }
@@ -66,7 +66,7 @@
 
         #library-view { display: flex; padding: 16px; overflow-y: auto; }
         #reader-view { display: none; }
-        #notes-view { display: none; padding: 16px; overflow-y: auto; }
+        #notes-view { display: none; padding: 16px; overflow-y: auto; background-color: var(--bg-color); }
 
         .library-title, .notes-title {
             font-size: 18px;
@@ -94,9 +94,10 @@
             background: #ccc;
         }
 
+        /* Barra superior sólida y de alto contraste */
         #header {
-            padding: 8px 12px;
-            font-size: 13px;
+            padding: 6px 10px;
+            font-size: 12px;
             font-weight: 600;
             background-color: var(--header-bg);
             border-bottom: 1px solid var(--border-color);
@@ -104,14 +105,14 @@
             display: flex;
             justify-content: space-between;
             align-items: center;
-            height: 45px;
+            height: 50px;
             box-sizing: border-box;
             z-index: 10;
         }
 
         #toolbar {
             display: flex;
-            gap: 6px;
+            gap: 4px;
             align-items: center;
         }
 
@@ -119,7 +120,7 @@
             flex: 1;
             position: relative;
             width: 100%;
-            height: calc(100vh - 95px);
+            height: calc(100vh - 100px);
             overflow: hidden;
         }
 
@@ -160,32 +161,32 @@
             box-sizing: border-box;
         }
 
-        /* Menú Flotante Sólido y Visible */
+        /* Menú Flotante Sólido con ajuste de límites */
         #selection-menu {
             position: fixed;
             display: none;
-            background-color: #222222;
-            border: 1px solid #555555;
+            background-color: #1f1f1f;
+            border: 1px solid #444444;
             padding: 8px;
             border-radius: 12px;
-            box-shadow: 0 6px 16px rgba(0,0,0,0.5);
+            box-shadow: 0 8px 24px rgba(0,0,0,0.6);
             z-index: 99999;
             gap: 6px;
         }
 
         .floating-btn {
-            background-color: #3390ec;
+            background-color: #1877f2;
             color: #ffffff;
             border: none;
-            padding: 8px 14px;
+            padding: 8px 12px;
             border-radius: 8px;
-            font-size: 13px;
+            font-size: 12px;
             cursor: pointer;
             font-weight: 600;
         }
 
         .item-row {
-            padding: 10px;
+            padding: 12px;
             border-bottom: 1px solid var(--border-color);
             margin-bottom: 8px;
             background: var(--header-bg);
@@ -193,62 +194,37 @@
             font-size: 13px;
         }
 
+        /* Modal de Búsqueda Sólido */
         #search-modal {
             position: absolute;
-            top: 50px;
+            top: 55px;
             right: 10px;
             width: 280px;
             background-color: var(--bg-color);
-            border: 1px solid var(--border-color);
+            border: 2px solid var(--border-color);
             border-radius: 8px;
-            padding: 12px;
-            box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+            padding: 14px;
+            box-shadow: 0 8px 24px rgba(0,0,0,0.4);
             display: none;
             z-index: 2000;
         }
 
         #search-modal input {
             width: calc(100% - 14px);
-            padding: 6px;
+            padding: 8px;
             margin-bottom: 8px;
             border: 1px solid var(--border-color);
             border-radius: 4px;
             background: var(--bg-color);
             color: var(--text-color);
+            font-size: 14px;
         }
 
         .search-result-item {
-            padding: 6px;
+            padding: 8px;
             border-bottom: 1px solid var(--border-color);
             cursor: pointer;
             font-size: 12px;
-        }
-
-        #zoom-modal {
-            position: fixed;
-            top: 0;
-            left: 0;
-            width: 100vw;
-            height: 100vh;
-            background-color: var(--bg-color);
-            color: var(--text-color);
-            z-index: 999999;
-            padding: 24px;
-            box-sizing: border-box;
-            display: none;
-            flex-direction: column;
-            justify-content: space-between;
-        }
-
-        #zoom-content {
-            font-size: 26px;
-            line-height: 1.8;
-            overflow-y: auto;
-            flex: 1;
-            margin-bottom: 20px;
-            padding: 10px;
-            background: var(--header-bg);
-            border-radius: 8px;
         }
 
         #nav-controls {
@@ -267,10 +243,10 @@
             background-color: var(--button-bg);
             color: var(--button-text);
             border: none;
-            padding: 6px 12px;
+            padding: 6px 10px;
             border-radius: 6px;
             font-weight: 600;
-            font-size: 12px;
+            font-size: 11px;
             cursor: pointer;
         }
 
@@ -285,7 +261,7 @@
             top: 50%;
             left: 50%;
             transform: translate(-50%, -50%);
-            background: rgba(0,0,0,0.8);
+            background: rgba(0,0,0,0.85);
             color: #fff;
             padding: 12px 20px;
             border-radius: 8px;
@@ -308,15 +284,18 @@
     <!-- 2. VISTA LECTOR -->
     <div id="reader-view" class="view-screen">
         <div id="header">
-            <button onclick="irABiblioteca()">⬅ Biblioteca</button>
-            <span id="book-title" style="overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 110px;">Lector</span>
+            <button onclick="irABiblioteca()">⬅ Biblio</button>
+            <div style="display: flex; align-items: center; gap: 4px;">
+                <span style="font-size: 10px;">Zoom:</span>
+                <input type="range" id="zoom-range" min="50" max="200" value="100" style="width: 70px;" oninput="aplicarZoomManual(this.value)">
+            </div>
             <div id="toolbar">
-                <button onclick="toggleModal('search-modal')">🔍 Lupa</button>
-                <button onclick="irANotas()">📝 Notas</button>
+                <button onclick="toggleModal('search-modal')">🔍</button>
+                <button onclick="irANotas()">📝</button>
                 <select id="theme-selector" onchange="cambiarTema(this.value)">
-                    <option value="day">☀️ Día</option>
-                    <option value="night">🌙 Noche</option>
-                    <option value="ebook">📖 Ebook</option>
+                    <option value="day">☀️</option>
+                    <option value="night">🌙</option>
+                    <option value="ebook">📖</option>
                 </select>
             </div>
         </div>
@@ -324,18 +303,17 @@
         <div id="viewer-container">
             <div id="epub-viewer"></div>
             <div id="pdf-viewer" style="display:none;"><canvas id="pdf-canvas"></canvas></div>
-            <div id="txt-viewer" style="display:none;" ondblclick="abrirZoom(this.innerText)"></div>
+            <div id="txt-viewer" style="display:none;"></div>
             
             <div id="selection-menu">
                 <button class="floating-btn" onclick="guardarDestacado()">✨ Destacar</button>
                 <button class="floating-btn" onclick="traducirTextoSelection()">🌐 Traducir</button>
-                <button class="floating-btn" onclick="abrirZoom(textoSeleccionadoActual)">🔍 Zoom</button>
             </div>
 
             <div id="search-modal" class="modal">
-                <input type="text" id="search-input" placeholder="Buscar..." onkeypress="if(event.key === 'Enter') ejecutarBusqueda()">
+                <input type="text" id="search-input" placeholder="Buscar palabra..." onkeypress="if(event.key === 'Enter') ejecutarBusqueda()">
                 <button onclick="ejecutarBusqueda()" style="width: 100%;">Buscar</button>
-                <div id="search-results" style="margin-top: 8px;"></div>
+                <div id="search-results" style="margin-top: 8px; max-height: 150px; overflow-y: auto;"></div>
             </div>
         </div>
 
@@ -350,19 +328,12 @@
     <div id="notes-view" class="view-screen">
         <div id="header">
             <button onclick="irALector()">⬅ Volver al Libro</button>
-            <span>📝 Notas y Traducciones</span>
+            <span class="notes-title" style="margin: 0;">📝 Notas y Traducciones</span>
             <div></div>
         </div>
         <div style="padding: 16px; flex: 1; overflow-y: auto;">
             <div id="notes-list">Sin notas guardadas.</div>
         </div>
-    </div>
-
-    <!-- 4. VISTA ZOOM PANTALLA COMPLETA -->
-    <div id="zoom-modal">
-        <div style="font-weight:bold; font-size:16px; margin-bottom:10px;">🔍 Vista Ampliada (Zoom)</div>
-        <div id="zoom-content"></div>
-        <button onclick="cerrarZoom()" style="padding: 14px; font-size:15px; background-color:#3390ec; color:#fff; border-radius:8px;">Cerrar Zoom</button>
     </div>
 
     <script>
@@ -427,7 +398,6 @@
         async function abrirLibro(libro) {
             libroActualId = libro.id;
             cambiarVista('reader-view');
-            document.getElementById('book-title').innerText = libro.titulo;
 
             const extension = libro.epub_url.split('.').pop().toLowerCase().split('?')[0];
             showLoading(true);
@@ -468,9 +438,9 @@
             document.body.className = `theme-${themeName}`;
             if (epubRendition) {
                 const themes = {
-                    day: { body: { background: "#ffffff", color: "#222222" } },
-                    night: { body: { background: "#181818", color: "#e0e0e0" } },
-                    ebook: { body: { background: "#fbf0d9", color: "#5f4b32" } }
+                    day: { body: { background: "#ffffff", color: "#111111" } },
+                    night: { body: { background: "#18191a", color: "#e4e6eb" } },
+                    ebook: { body: { background: "#fbf0d9", color: "#4a3b2c" } }
                 };
                 epubRendition.themes.register("custom", themes[themeName]);
                 epubRendition.themes.select("custom");
@@ -482,15 +452,11 @@
             modal.style.display = modal.style.display === 'block' ? 'none' : 'block';
         }
 
-        function abrirZoom(texto) {
-            if (!texto) return;
-            document.getElementById('zoom-content').innerText = texto;
-            document.getElementById('zoom-modal').style.display = 'flex';
-            document.getElementById('selection-menu').style.display = 'none';
-        }
-
-        function cerrarZoom() {
-            document.getElementById('zoom-modal').style.display = 'none';
+        // Control manual de Zoom por barra deslizante (Slider)
+        function aplicarZoomManual(valor) {
+            if (epubRendition) {
+                epubRendition.themes.fontSize(valor + "%");
+            }
         }
 
         async function traducirTextoSelection() {
@@ -609,7 +575,7 @@
                 guardarProgresoEnNube(location.start.cfi);
             });
 
-            // Capturar la selección dentro del iframe de EPUB y mostrar menú sólido
+            // Posicionamiento inteligente del menú flotante sin desbordarse de la pantalla
             epubRendition.on("selected", (cfiRange, contents) => {
                 cfiRangeActual = cfiRange;
                 textoSeleccionadoActual = contents.window.getSelection().toString();
@@ -618,8 +584,13 @@
                 if (selection.rangeCount > 0 && textoSeleccionadoActual.trim().length > 0) {
                     const range = selection.getRangeAt(0);
                     const rect = range.getBoundingClientRect();
-                    menu.style.top = `${Math.max(10, rect.top - 60)}px`;
-                    menu.style.left = `${Math.max(10, rect.left)}px`;
+                    
+                    let posX = Math.max(10, Math.min(rect.left, window.innerWidth - 200));
+                    let posY = rect.top - 60;
+                    if (posY < 50) posY = rect.bottom + 10; // Si está muy arriba, mostrar debajo
+
+                    menu.style.top = `${posY}px`;
+                    menu.style.left = `${posX}px`;
                     menu.style.display = 'flex';
                 }
             });
