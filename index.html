@@ -19,25 +19,25 @@
     <style>
         :root.theme-day {
             --bg-color: #ffffff;
-            --text-color: #111111;
+            --text-color: #4b5563; /* Gris medio/oscuro legible */
             --header-bg: #e4e6eb;
             --border-color: #bcc0c4;
-            --button-bg: #eab308; /* Amarillo de alto contraste */
+            --button-bg: #eab308;
             --button-text: #111111;
         }
 
         :root.theme-night {
             --bg-color: #121212;
-            --text-color: #f0f0f0;
+            --text-color: #9ca3af; /* Gris claro para texto general y notas */
             --header-bg: #1e1e1e;
             --border-color: #333333;
-            --button-bg: #eab308; /* Amarillo brillante */
+            --button-bg: #eab308;
             --button-text: #121212;
         }
 
         :root.theme-ebook {
             --bg-color: #fbf0d9;
-            --text-color: #4a3b2c;
+            --text-color: #5c4a38;
             --header-bg: #edd5b1;
             --border-color: #d4bc97;
             --button-bg: #ca8a04;
@@ -65,14 +65,15 @@
             background-color: var(--bg-color);
         }
 
-        #library-view { display: flex; padding: 16px; overflow-y: auto; }
+        #library-view { display: flex; padding: 16px; overflow-y: auto; color: var(--text-color); }
         #reader-view { display: none; }
-        #notes-view { display: none; padding: 16px; overflow-y: auto; background-color: var(--bg-color); z-index: 100; }
+        #notes-view { display: none; padding: 16px; overflow-y: auto; background-color: var(--bg-color); z-index: 100; color: var(--text-color); }
 
         .library-title, .notes-title {
             font-size: 18px;
             font-weight: bold;
             margin-bottom: 12px;
+            color: var(--text-color);
         }
 
         .book-card {
@@ -85,6 +86,7 @@
             display: flex;
             align-items: center;
             gap: 12px;
+            color: var(--text-color);
         }
 
         .book-card img {
@@ -95,14 +97,14 @@
             background: #ccc;
         }
 
-        /* Menú superior con textos en gris claro y botones amarillos para máxima visibilidad */
+        /* Menú superior con textos en gris claro */
         #header {
             padding: 6px 10px;
             font-size: 12px;
             font-weight: 600;
             background-color: var(--header-bg);
             border-bottom: 2px solid var(--border-color);
-            color: #d1d5db; /* Gris claro legible */
+            color: #9ca3af; /* Gris claro */
             display: flex;
             justify-content: space-between;
             align-items: center;
@@ -111,23 +113,26 @@
             z-index: 50;
         }
 
+        /* Contenedor estricto para asegurar la visualización del libro EPUB */
         #viewer-container {
             flex: 1;
             position: relative;
             width: 100%;
             height: calc(100vh - 102px);
-            overflow: hidden; /* Por defecto estático hasta activar el zoom */
+            overflow: hidden; 
         }
 
         #viewer-container.zoom-activo {
-            overflow: auto; /* Permite scroll en todas direcciones al activar zoom */
+            overflow: auto; /* Permite scroll libre en todas direcciones al activar zoom */
             -webkit-overflow-scrolling: touch;
         }
 
         #epub-viewer {
             width: 100%;
             height: 100%;
-            position: relative;
+            position: absolute;
+            top: 0;
+            left: 0;
         }
 
         #pdf-viewer {
@@ -159,7 +164,6 @@
             box-sizing: border-box;
         }
 
-        /* Menú Flotante con Destacar, Traducir y Zoom */
         #selection-menu {
             position: fixed;
             display: none;
@@ -183,6 +187,7 @@
             font-weight: bold;
         }
 
+        /* Textos dentro de las notas en color gris */
         .item-row {
             padding: 12px;
             border-bottom: 1px solid var(--border-color);
@@ -190,6 +195,7 @@
             background: var(--header-bg);
             border-radius: 6px;
             font-size: 13px;
+            color: #9ca3af !important; /* Gris claro */
         }
 
         #search-results-container {
@@ -213,8 +219,10 @@
             border-bottom: 1px solid var(--border-color);
             cursor: pointer;
             font-size: 12px;
+            color: var(--text-color);
         }
 
+        /* Barra de navegación inferior con textos en gris */
         #nav-controls {
             display: flex;
             justify-content: space-between;
@@ -225,9 +233,9 @@
             height: 50px;
             box-sizing: border-box;
             z-index: 50;
+            color: #9ca3af; /* Gris claro */
         }
 
-        /* Botones y controles de alto contraste */
         button, select, input[type="text"] {
             background-color: var(--button-bg);
             color: var(--button-text);
@@ -281,7 +289,7 @@
         <div id="header">
             <button onclick="irABiblioteca()">⬅ Biblio</button>
             <div style="display: flex; align-items: center; gap: 3px;">
-                <span style="font-size: 10px; color: #eab308; font-weight: bold;">Zoom:</span>
+                <span style="font-size: 10px; color: #9ca3af; font-weight: bold;">Zoom:</span>
                 <input type="range" id="zoom-range" min="100" max="250" value="100" style="width: 55px;" oninput="aplicarZoomManual(this.value)">
             </div>
             <div style="display: flex; align-items: center; gap: 3px;">
@@ -299,7 +307,7 @@
         </div>
 
         <div id="search-results-container">
-            <div style="display: flex; justify-content: space-between; font-weight: bold; margin-bottom: 5px;">
+            <div style="display: flex; justify-content: space-between; font-weight: bold; margin-bottom: 5px; color: var(--text-color);">
                 <span>Resultados</span>
                 <button onclick="cerrarBusqueda()" style="background: red; padding: 2px 6px;">✕</button>
             </div>
@@ -321,7 +329,7 @@
 
         <div id="nav-controls">
             <button id="prev-btn">Anterior</button>
-            <span id="page-info" style="color: #eab308; font-weight: bold;">0%</span>
+            <span id="page-info" style="color: #9ca3af; font-weight: bold;">0%</span>
             <button id="next-btn">Siguiente</button>
         </div>
     </div>
@@ -330,10 +338,10 @@
     <div id="notes-view" class="view-screen">
         <div id="header">
             <button onclick="irALector()">⬅ Volver</button>
-            <span class="notes-title" style="margin: 0; color: #eab308;">📝 Notas</span>
+            <span class="notes-title" style="margin: 0; color: #9ca3af;">📝 Notas</span>
             <div></div>
         </div>
-        <div style="padding: 16px; flex: 1; overflow-y: auto;">
+        <div style="padding: 16px; flex: 1; overflow-y: auto; color: #9ca3af;">
             <div id="notes-list">Sin notas guardadas.</div>
         </div>
     </div>
@@ -440,9 +448,9 @@
             document.body.className = `theme-${themeName}`;
             if (epubRendition) {
                 const themes = {
-                    day: { body: { background: "#ffffff", color: "#111111" } },
-                    night: { body: { background: "#121212", color: "#f0f0f0" } },
-                    ebook: { body: { background: "#fbf0d9", color: "#4a3b2c" } }
+                    day: { body: { background: "#ffffff", color: "#4b5563" } },
+                    night: { body: { background: "#121212", color: "#9ca3af" } },
+                    ebook: { body: { background: "#fbf0d9", color: "#5c4a38" } }
                 };
                 epubRendition.themes.register("custom", themes[themeName]);
                 epubRendition.themes.select("custom");
@@ -455,14 +463,13 @@
             }
         }
 
-        // Función para activar el zoom y permitir scroll libre en todas direcciones
         function activarZoomPagina() {
             const container = document.getElementById('viewer-container');
             container.classList.toggle('zoom-activo');
             document.getElementById('selection-menu').style.display = 'none';
             
             const activo = container.classList.contains('zoom-activo');
-            alert(activo ? "Zoom activado: ya puedes moverte libremente por la página." : "Zoom desactivado.");
+            alert(activo ? "Zoom activado: ya puedes moverte en todas direcciones." : "Zoom desactivado.");
         }
 
         async function traducirTextoSelection() {
@@ -579,6 +586,7 @@
             document.getElementById('epub-viewer').innerHTML = "";
 
             epubBook = ePub(url);
+            // Modo paginado horizontal para que funcione el porcentaje de hojas perfectamente
             epubRendition = epubBook.renderTo("epub-viewer", { width: "100%", height: "100%", flow: "paginated" });
             
             epubRendition.display(posCfi || undefined).then(() => {
