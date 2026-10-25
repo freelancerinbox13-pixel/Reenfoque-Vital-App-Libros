@@ -3,21 +3,45 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Lector de EPUB - Telegram Mini App</title>
+    <title>Lector Pro - Telegram Mini App</title>
     
     <!-- SDK de Telegram WebApp -->
     <script src="https://telegram.org/js/telegram-web-app.js"></script>
     
-    <!-- Librería ePub.js y dependencias -->
+    <!-- Dependencias para EPUB -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.1.5/jszip.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/epubjs/dist/epub.min.js"></script>
+    
+    <!-- Dependencias para PDF -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.16.105/pdf.min.js"></script>
 
     <style>
-        :root {
-            --bg-color: var(--tg-theme-bg-color, #ffffff);
-            --text-color: var(--tg-theme-text-color, #222222);
-            --button-color: var(--tg-theme-button-color, #3390ec);
-            --button-text-color: var(--tg-theme-button-text-color, #ffffff);
+        /* Temas de Visualización */
+        :root.theme-day {
+            --bg-color: #ffffff;
+            --text-color: #222222;
+            --header-bg: #f5f5f5;
+            --border-color: #e0e0e0;
+            --button-bg: #3390ec;
+            --button-text: #ffffff;
+        }
+
+        :root.theme-night {
+            --bg-color: #181818;
+            --text-color: #e0e0e0;
+            --header-bg: #222222;
+            --border-color: #333333;
+            --button-bg: #2b5278;
+            --button-text: #ffffff;
+        }
+
+        :root.theme-ebook {
+            --bg-color: #fbf0d9; /* Tono Sepia / Papel antiguo */
+            --text-color: #5f4b32;
+            --header-bg: #f1e2c8;
+            --border-color: #dfceb2;
+            --button-bg: #8c6d48;
+            --button-text: #ffffff;
         }
 
         body {
@@ -30,22 +54,88 @@
             flex-direction: column;
             height: 100vh;
             overflow: hidden;
+            transition: background-color 0.3s, color 0.3s;
         }
 
         #header {
-            padding: 10px 16px;
-            font-size: 14px;
+            padding: 8px 16px;
+            font-size: 13px;
             font-weight: 600;
-            border-bottom: 1px solid rgba(0,0,0,0.1);
+            background-color: var(--header-bg);
+            border-bottom: 1px solid var(--border-color);
             display: flex;
             justify-content: space-between;
             align-items: center;
+            z-index: 10;
         }
 
-        #viewer {
+        #toolbar {
+            display: flex;
+            gap: 6px;
+            align-items: center;
+        }
+
+        #viewer-container {
             flex: 1;
+            position: relative;
             width: 100%;
-            height: calc(100vh - 100px);
+            overflow: auto;
+        }
+
+        #epub-viewer {
+            width: 100%;
+            height: 100%;
+        }
+
+        #pdf-viewer {
+            width: 100%;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            padding: 10px;
+        }
+
+        #pdf-canvas {
+            max-width: 100%;
+            height: auto;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+        }
+
+        #txt-viewer {
+            padding: 20px;
+            white-space: pre-wrap;
+            font-size: 16px;
+            line-height: 1.6;
+        }
+
+        #nav-controls {
+            display: none;
+            justify-content: space-between;
+            padding: 10px 16px;
+            background-color: var(--header-bg);
+            border-top: 1px solid var(--border-color);
+            z-index: 10;
+        }
+
+        button, select {
+            background-color: var(--button-bg);
+            color: var(--button-text);
+            border: none;
+            padding: 6px 12px;
+            border-radius: 6px;
+            font-weight: 600;
+            font-size: 12px;
+            cursor: pointer;
+        }
+
+        select {
+            background-color: var(--bg-color);
+            color: var(--text-color);
+            border: 1px solid var(--border-color);
+        }
+
+        button:active {
+            opacity: 0.8;
         }
 
         #loading {
@@ -54,25 +144,153 @@
             left: 50%;
             transform: translate(-50%, -50%);
             text-align: center;
-            font-size: 16px;
+            font-size: 15px;
         }
     </style>
 </head>
-<body>
+<body class="theme-day">
 
     <div id="header">
-        <span id="book-title">Lector EPUB - Preparado</span>
+        <span id="book-title">Cargando lector...</span>
+        <div id="toolbar">
+            <select id="theme-selector" onchange="cambiarTema(this.value)">
+                <option value="day">☀️ Día</option>
+                <option value="night">🌙 Noche</option>
+                <option value="ebook">📖 Ebook</option>
+            </select>
+            <span id="page-info"></span>
+        </div>
     </div>
 
-    <div id="loading">Despliegue exitoso en Vercel. Listo para conectar con Supabase.</div>
-    <div id="viewer"></div>
+    <div id="loading">Preparando visor...</div>
+    
+    <div id="viewer-container">
+        <div id="epub-viewer"></div>
+        <div id="pdf-viewer" style="display:none;"><canvas id="pdf-canvas"></canvas></div>
+        <div id="txt-viewer" style="display:none;"></div>
+    </div>
+
+    <div id="nav-controls">
+        <button id="prev-btn">Anterior</button>
+        <button id="next-btn">Siguiente</button>
+    </div>
 
     <script>
-        // Inicialización básica de Telegram WebApp
         const tg = window.Telegram.WebApp;
         tg.expand();
 
-        console.log("Mini App inicializada correctamente en Vercel.");
+        // URL de prueba (Soporta .epub, .pdf, .txt)
+        const sampleUrl = "https://s3.amazonaws.com/epubjs/books/alice.epub"; 
+
+        let epubBook, epubRendition;
+        let pdfDoc = null, pageNum = 1, pdfScale = 1.2;
+
+        async function initReader(fileUrl) {
+            try {
+                document.getElementById('loading').style.display = 'block';
+                const extension = fileUrl.split('.').pop().toLowerCase().split('?')[0];
+
+                if (extension === 'epub') {
+                    initEpub(fileUrl);
+                } else if (extension === 'pdf') {
+                    initPdf(fileUrl);
+                } else if (extension === 'txt') {
+                    initTxt(fileUrl);
+                } else {
+                    throw new Error("Formato no soportado.");
+                }
+
+                document.getElementById('loading').style.display = 'none';
+            } catch (err) {
+                console.error(err);
+                document.getElementById('loading').innerText = "Error al cargar el libro.";
+            }
+        }
+
+        // --- GESTIÓN DE TEMAS (Día, Noche, Ebook) ---
+        function cambiarTema(themeName) {
+            // Cambiar clase en el body para la app general
+            document.body.className = `theme-${themeName}`;
+
+            // Si hay un EPUB activo, adaptar sus estilos internos mediante ePub.js
+            if (epubRendition) {
+                const themes = {
+                    day: { body: { background: "#ffffff", color: "#222222" } },
+                    night: { body: { background: "#181818", color: "#e0e0e0" } },
+                    ebook: { body: { background: "#fbf0d9", color: "#5f4b32" } }
+                };
+                epubRendition.themes.register("custom", themes[themeName]);
+                epubRendition.themes.select("custom");
+            }
+        }
+
+        // --- EPUB RENDERER ---
+        function initEpub(url) {
+            document.getElementById('epub-viewer').style.display = 'block';
+            document.getElementById('nav-controls').style.display = 'flex';
+            document.getElementById('book-title').innerText = "Lector EPUB";
+
+            epubBook = ePub(url);
+            epubRendition = epubBook.renderTo("epub-viewer", {
+                width: "100%",
+                height: "100%"
+            });
+            epubRendition.display();
+
+            // Aplicar el tema inicial por defecto
+            cambiarTema(document.getElementById('theme-selector').value);
+
+            document.getElementById('prev-btn').onclick = () => epubRendition.prev();
+            document.getElementById('next-btn').onclick = () => epubRendition.next();
+        }
+
+        // --- PDF RENDERER ---
+        async function initPdf(url) {
+            document.getElementById('pdf-viewer').style.display = 'flex';
+            document.getElementById('nav-controls').style.display = 'flex';
+            document.getElementById('book-title').innerText = "Lector PDF";
+
+            pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.16.105/pdf.worker.min.js';
+            const loadingTask = pdfjsLib.getDocument(url);
+            pdfDoc = await loadingTask.promise;
+            renderPage(pageNum);
+
+            document.getElementById('prev-btn').onclick = () => {
+                if (pageNum <= 1) return;
+                pageNum--;
+                renderPage(pageNum);
+            };
+            document.getElementById('next-btn').onclick = () => {
+                if (pageNum >= pdfDoc.numPages) return;
+                pageNum++;
+                renderPage(pageNum);
+            };
+        }
+
+        async function renderPage(num) {
+            const page = await pdfDoc.getPage(num);
+            const canvas = document.getElementById('pdf-canvas');
+            const ctx = canvas.getContext('2d');
+            const viewport = page.getViewport({ scale: pdfScale });
+
+            canvas.height = viewport.height;
+            canvas.width = viewport.width;
+
+            await page.render({ canvasContext: ctx, viewport: viewport }).promise;
+            document.getElementById('page-info').innerText = `${num} / ${pdfDoc.numPages}`;
+        }
+
+        // --- TXT RENDERER ---
+        async function initTxt(url) {
+            document.getElementById('txt-viewer').style.display = 'block';
+            document.getElementById('book-title').innerText = "Lector TXT";
+
+            const response = await fetch(url);
+            const text = await response.text();
+            document.getElementById('txt-viewer').innerText = text;
+        }
+
+        window.addEventListener('load', () => initReader(sampleUrl));
     </script>
 </body>
 </html>
