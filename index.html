@@ -62,11 +62,12 @@
             width: 100%;
             height: 100vh;
             box-sizing: border-box;
+            background-color: var(--bg-color);
         }
 
         #library-view { display: flex; padding: 16px; overflow-y: auto; }
         #reader-view { display: none; }
-        #notes-view { display: none; padding: 16px; overflow-y: auto; background-color: var(--bg-color); }
+        #notes-view { display: none; padding: 16px; overflow-y: auto; background-color: var(--bg-color); z-index: 100; }
 
         .library-title, .notes-title {
             font-size: 18px;
@@ -94,20 +95,20 @@
             background: #ccc;
         }
 
-        /* Barra superior sólida y de alto contraste */
+        /* Barra superior completamente sólida e independiente */
         #header {
             padding: 6px 10px;
             font-size: 12px;
             font-weight: 600;
             background-color: var(--header-bg);
-            border-bottom: 1px solid var(--border-color);
+            border-bottom: 2px solid var(--border-color);
             color: var(--text-color);
             display: flex;
             justify-content: space-between;
             align-items: center;
-            height: 50px;
+            height: 52px;
             box-sizing: border-box;
-            z-index: 10;
+            z-index: 50;
         }
 
         #toolbar {
@@ -120,16 +121,14 @@
             flex: 1;
             position: relative;
             width: 100%;
-            height: calc(100vh - 100px);
-            overflow: hidden;
+            height: calc(100vh - 102px);
+            overflow: auto;
         }
 
         #epub-viewer {
             width: 100%;
             height: 100%;
-            position: absolute;
-            top: 0;
-            left: 0;
+            position: relative;
         }
 
         #pdf-viewer {
@@ -161,7 +160,7 @@
             box-sizing: border-box;
         }
 
-        /* Menú Flotante Sólido con ajuste de límites */
+        /* Menú Flotante de Selección Sólido */
         #selection-menu {
             position: fixed;
             display: none;
@@ -194,7 +193,7 @@
             font-size: 13px;
         }
 
-        /* Modal de Búsqueda Sólido */
+        /* Modal de Búsqueda totalmente sólido y seguro */
         #search-modal {
             position: absolute;
             top: 55px;
@@ -204,7 +203,7 @@
             border: 2px solid var(--border-color);
             border-radius: 8px;
             padding: 14px;
-            box-shadow: 0 8px 24px rgba(0,0,0,0.4);
+            box-shadow: 0 8px 24px rgba(0,0,0,0.5);
             display: none;
             z-index: 2000;
         }
@@ -236,7 +235,7 @@
             border-top: 1px solid var(--border-color);
             height: 50px;
             box-sizing: border-box;
-            z-index: 10;
+            z-index: 50;
         }
 
         button, select {
@@ -287,7 +286,7 @@
             <button onclick="irABiblioteca()">⬅ Biblio</button>
             <div style="display: flex; align-items: center; gap: 4px;">
                 <span style="font-size: 10px;">Zoom:</span>
-                <input type="range" id="zoom-range" min="50" max="200" value="100" style="width: 70px;" oninput="aplicarZoomManual(this.value)">
+                <input type="range" id="zoom-range" min="50" max="200" value="100" style="width: 65px;" oninput="aplicarZoomManual(this.value)">
             </div>
             <div id="toolbar">
                 <button onclick="toggleModal('search-modal')">🔍</button>
@@ -452,7 +451,6 @@
             modal.style.display = modal.style.display === 'block' ? 'none' : 'block';
         }
 
-        // Control manual de Zoom por barra deslizante (Slider)
         function aplicarZoomManual(valor) {
             if (epubRendition) {
                 epubRendition.themes.fontSize(valor + "%");
@@ -563,10 +561,17 @@
             document.getElementById('epub-viewer').innerHTML = "";
 
             epubBook = ePub(url);
-            epubRendition = epubBook.renderTo("epub-viewer", { width: "100%", height: "100%" });
+            epubRendition = epubBook.renderTo("epub-viewer", { width: "100%", height: "100%", flow: "scrolled" });
             
             epubRendition.display(posCfi || undefined).then(() => {
                 cambiarTema(document.getElementById('theme-selector').value);
+            });
+
+            // Solución de rotación y adaptación de pantalla al girar el dispositivo
+            window.addEventListener('resize', () => {
+                if (epubRendition) {
+                    epubRendition.resize();
+                }
             });
 
             epubRendition.on("relocated", (location) => {
@@ -575,7 +580,6 @@
                 guardarProgresoEnNube(location.start.cfi);
             });
 
-            // Posicionamiento inteligente del menú flotante sin desbordarse de la pantalla
             epubRendition.on("selected", (cfiRange, contents) => {
                 cfiRangeActual = cfiRange;
                 textoSeleccionadoActual = contents.window.getSelection().toString();
@@ -587,7 +591,7 @@
                     
                     let posX = Math.max(10, Math.min(rect.left, window.innerWidth - 200));
                     let posY = rect.top - 60;
-                    if (posY < 50) posY = rect.bottom + 10; // Si está muy arriba, mostrar debajo
+                    if (posY < 60) posY = rect.bottom + 10;
 
                     menu.style.top = `${posY}px`;
                     menu.style.left = `${posX}px`;
@@ -614,7 +618,7 @@
             document.getElementById('next-btn').onclick = () => { if (pageNum < pdfDoc.numPages) { pageNum++; renderPage(pageNum); guardarProgresoEnNube(pageNum); } };
         }
 
-        async function renderPage(num) {
+        async	 function renderPage(num) {
             const page = await pdfDoc.getPage(num);
             const canvas = document.getElementById('pdf-canvas');
             const ctx = canvas.getContext('2d');
