@@ -19,7 +19,7 @@
     <style>
         :root.theme-day {
             --bg-color: #ffffff;
-            --text-color: #4b5563; /* Gris medio/oscuro legible */
+            --text-color: #4b5563;
             --header-bg: #e4e6eb;
             --border-color: #bcc0c4;
             --button-bg: #eab308;
@@ -28,7 +28,7 @@
 
         :root.theme-night {
             --bg-color: #121212;
-            --text-color: #9ca3af; /* Gris claro para texto general y notas */
+            --text-color: #9ca3af;
             --header-bg: #1e1e1e;
             --border-color: #333333;
             --button-bg: #eab308;
@@ -73,7 +73,7 @@
             font-size: 18px;
             font-weight: bold;
             margin-bottom: 12px;
-            color: var(--text-color);
+            color: #9ca3af !important; /* Gris */
         }
 
         .book-card {
@@ -86,7 +86,7 @@
             display: flex;
             align-items: center;
             gap: 12px;
-            color: var(--text-color);
+            color: #9ca3af !important; /* Gris */
         }
 
         .book-card img {
@@ -97,14 +97,24 @@
             background: #ccc;
         }
 
-        /* Menú superior con textos en gris claro */
+        .book-title-text {
+            font-weight: 600;
+            font-size: 14px;
+            color: #9ca3af !important; /* Gris */
+        }
+
+        .book-card button {
+            color: #9ca3af !important; /* Gris */
+            background-color: #374151;
+        }
+
         #header {
             padding: 6px 10px;
             font-size: 12px;
             font-weight: 600;
             background-color: var(--header-bg);
             border-bottom: 2px solid var(--border-color);
-            color: #9ca3af; /* Gris claro */
+            color: #9ca3af;
             display: flex;
             justify-content: space-between;
             align-items: center;
@@ -113,7 +123,6 @@
             z-index: 50;
         }
 
-        /* Contenedor estricto para asegurar la visualización del libro EPUB */
         #viewer-container {
             flex: 1;
             position: relative;
@@ -123,7 +132,7 @@
         }
 
         #viewer-container.zoom-activo {
-            overflow: auto; /* Permite scroll libre en todas direcciones al activar zoom */
+            overflow: auto;
             -webkit-overflow-scrolling: touch;
         }
 
@@ -187,7 +196,6 @@
             font-weight: bold;
         }
 
-        /* Textos dentro de las notas en color gris */
         .item-row {
             padding: 12px;
             border-bottom: 1px solid var(--border-color);
@@ -195,7 +203,7 @@
             background: var(--header-bg);
             border-radius: 6px;
             font-size: 13px;
-            color: #9ca3af !important; /* Gris claro */
+            color: #9ca3af !important;
         }
 
         #search-results-container {
@@ -222,7 +230,6 @@
             color: var(--text-color);
         }
 
-        /* Barra de navegación inferior con textos en gris */
         #nav-controls {
             display: flex;
             justify-content: space-between;
@@ -233,7 +240,7 @@
             height: 50px;
             box-sizing: border-box;
             z-index: 50;
-            color: #9ca3af; /* Gris claro */
+            color: #9ca3af;
         }
 
         button, select, input[type="text"] {
@@ -287,21 +294,21 @@
     <!-- 2. VISTA LECTOR -->
     <div id="reader-view" class="view-screen">
         <div id="header">
-            <button onclick="irABiblioteca()">⬅ Biblio</button>
+            <button onclick="irABiblioteca()" style="color: #9ca3af; background: #374151;">⬅ Biblio</button>
             <div style="display: flex; align-items: center; gap: 3px;">
                 <span style="font-size: 10px; color: #9ca3af; font-weight: bold;">Zoom:</span>
                 <input type="range" id="zoom-range" min="100" max="250" value="100" style="width: 55px;" oninput="aplicarZoomManual(this.value)">
             </div>
             <div style="display: flex; align-items: center; gap: 3px;">
                 <input type="text" id="search-input" placeholder="Buscar..." style="width: 70px;" onkeypress="if(event.key === 'Enter') ejecutarBusqueda()">
-                <button onclick="ejecutarBusqueda()">🔍</button>
+                <button onclick="ejecutarBusqueda()" style="color: #111; background: #eab308;">🔍</button>
             </div>
             <div style="display: flex; gap: 4px; align-items: center;">
-                <button onclick="irANotas()">📝</button>
+                <button onclick="irANotas()" style="color: #9ca3af; background: #374151;">📝</button>
                 <select id="theme-selector" onchange="cambiarTema(this.value)">
-                    <option value="day">☀️</option>
-                    <option value="night">🌙</option>
-                    <option value="ebook">📖</option>
+                    <option value="day">☀️ Día</option>
+                    <option value="night">🌙 Noche</option>
+                    <option value="ebook">📖 Ebook</option>
                 </select>
             </div>
         </div>
@@ -319,7 +326,6 @@
             <div id="pdf-viewer" style="display:none;"><canvas id="pdf-canvas"></canvas></div>
             <div id="txt-viewer" style="display:none;"></div>
             
-            <!-- Menú flotante actualizado con Destacar, Traducir y Zoom -->
             <div id="selection-menu">
                 <button class="floating-btn" onclick="guardarDestacado()">✨ Destacar</button>
                 <button class="floating-btn" onclick="traducirTextoSelection()">🌐 Traducir</button>
@@ -328,16 +334,16 @@
         </div>
 
         <div id="nav-controls">
-            <button id="prev-btn">Anterior</button>
-            <span id="page-info" style="color: #9ca3af; font-weight: bold;">0%</span>
-            <button id="next-btn">Siguiente</button>
+            <button id="prev-btn" style="color: #9ca3af; background: #374151;">Anterior</button>
+            <span id="page-info" style="color: #eab308; font-weight: bold;">0%</span>
+            <button id="next-btn" style="color: #9ca3af; background: #374151;">Siguiente</button>
         </div>
     </div>
 
     <!-- 3. VISTA DE NOTAS -->
     <div id="notes-view" class="view-screen">
         <div id="header">
-            <button onclick="irALector()">⬅ Volver</button>
+            <button onclick="irALector()" style="color: #9ca3af; background: #374151;">⬅ Volver</button>
             <span class="notes-title" style="margin: 0; color: #9ca3af;">📝 Notas</span>
             <div></div>
         </div>
@@ -390,9 +396,9 @@
                     card.innerHTML = `
                         <img src="${coverImgUrl || 'https://via.placeholder.com/45x60?text=EPUB'}" alt="Portada">
                         <div style="flex: 1;">
-                            <div style="font-weight:600; font-size:14px;">${libro.titulo}</div>
+                            <div class="book-title-text">${libro.titulo}</div>
                         </div>
-                        <button>Leer</button>
+                        <button style="color: #9ca3af; background: #374151; padding: 6px 10px; border-radius: 6px; border: none; font-weight: bold;">Leer</button>
                     `;
                     card.onclick = () => abrirLibro(libro);
                     listContainer.appendChild(card);
@@ -586,7 +592,6 @@
             document.getElementById('epub-viewer').innerHTML = "";
 
             epubBook = ePub(url);
-            // Modo paginado horizontal para que funcione el porcentaje de hojas perfectamente
             epubRendition = epubBook.renderTo("epub-viewer", { width: "100%", height: "100%", flow: "paginated" });
             
             epubRendition.display(posCfi || undefined).then(() => {
