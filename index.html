@@ -20,8 +20,8 @@
         :root.theme-day {
             --bg-color: #ffffff;
             --text-color: #111111;
-            --header-bg: #e4e6eb;
-            --border-color: #bcc0c4;
+            --header-bg: #f0f2f5;
+            --border-color: #ccd0d5;
             --button-bg: #1877f2;
             --button-text: #ffffff;
         }
@@ -95,9 +95,9 @@
             background: #ccc;
         }
 
-        /* Menú superior totalmente sólido, visible y adaptado a móviles */
+        /* Menú superior altamente visible y estructurado para móviles */
         #header {
-            padding: 4px 8px;
+            padding: 4px 6px;
             font-size: 11px;
             font-weight: 600;
             background-color: var(--header-bg);
@@ -106,30 +106,25 @@
             display: flex;
             justify-content: space-between;
             align-items: center;
-            height: 55px;
+            height: 50px;
             box-sizing: border-box;
             z-index: 50;
-            overflow-x: auto;
-        }
-
-        #toolbar {
-            display: flex;
-            gap: 3px;
-            align-items: center;
         }
 
         #viewer-container {
             flex: 1;
             position: relative;
             width: 100%;
-            height: calc(100vh - 105px);
-            overflow: auto;
+            height: calc(100vh - 100px);
+            overflow: hidden;
         }
 
         #epub-viewer {
             width: 100%;
             height: 100%;
-            position: relative;
+            position: absolute;
+            top: 0;
+            left: 0;
         }
 
         #pdf-viewer {
@@ -165,8 +160,8 @@
         #selection-menu {
             position: fixed;
             display: none;
-            background-color: #1f1f1f;
-            border: 1px solid #444444;
+            background-color: #222222;
+            border: 1px solid #555555;
             padding: 8px;
             border-radius: 12px;
             box-shadow: 0 8px 24px rgba(0,0,0,0.6);
@@ -194,14 +189,14 @@
             font-size: 13px;
         }
 
-        /* Resultados de Búsqueda integrados debajo del menú o panel independiente */
+        /* Resultados de búsqueda sólidos */
         #search-results-container {
             display: none;
             position: absolute;
-            top: 55px;
+            top: 50px;
             left: 0;
             width: 100%;
-            max-height: 200px;
+            max-height: 180px;
             background-color: var(--bg-color);
             border-bottom: 2px solid var(--border-color);
             box-shadow: 0 8px 16px rgba(0,0,0,0.4);
@@ -285,13 +280,13 @@
             <button onclick="irABiblioteca()">⬅ Biblio</button>
             <div style="display: flex; align-items: center; gap: 2px;">
                 <span style="font-size: 9px;">Zoom:</span>
-                <input type="range" id="zoom-range" min="50" max="200" value="100" style="width: 55px;" oninput="aplicarZoomManual(this.value)">
+                <input type="range" id="zoom-range" min="50" max="200" value="100" style="width: 50px;" oninput="aplicarZoomManual(this.value)">
             </div>
             <div style="display: flex; align-items: center; gap: 2px;">
-                <input type="text" id="search-input" placeholder="Buscar..." style="width: 75px;" onkeypress="if(event.key === 'Enter') ejecutarBusqueda()">
+                <input type="text" id="search-input" placeholder="Buscar..." style="width: 65px;" onkeypress="if(event.key === 'Enter') ejecutarBusqueda()">
                 <button onclick="ejecutarBusqueda()">🔍</button>
             </div>
-            <div id="toolbar">
+            <div style="display: flex; gap: 3px; align-items: center;">
                 <button onclick="irANotas()">📝</button>
                 <select id="theme-selector" onchange="cambiarTema(this.value)">
                     <option value="day">☀️</option>
@@ -301,13 +296,12 @@
             </div>
         </div>
 
-        <!-- Contenedor de resultados de búsqueda integrado justo debajo del menú -->
         <div id="search-results-container">
             <div style="display: flex; justify-content: space-between; font-weight: bold; margin-bottom: 5px;">
-                <span>Resultados de búsqueda</span>
+                <span>Resultados</span>
                 <button onclick="cerrarBusqueda()" style="background: red; padding: 2px 6px;">✕</button>
             </div>
-            <div id="search-results">Escribe una palabra y presiona buscar.</div>
+            <div id="search-results">Escribe una palabra.</div>
         </div>
         
         <div id="viewer-container">
@@ -328,11 +322,11 @@
         </div>
     </div>
 
-    <!-- 3. VISTA DE NOTAS INDEPENDIENTE -->
+    <!-- 3. VISTA DE NOTAS -->
     <div id="notes-view" class="view-screen">
         <div id="header">
-            <button onclick="irALector()">⬅ Volver al Libro</button>
-            <span class="notes-title" style="margin: 0;">📝 Notas y Traducciones</span>
+            <button onclick="irALector()">⬅ Volver</button>
+            <span class="notes-title" style="margin: 0;">📝 Notas</span>
             <div></div>
         </div>
         <div style="padding: 16px; flex: 1; overflow-y: auto;">
@@ -571,7 +565,8 @@
             document.getElementById('epub-viewer').innerHTML = "";
 
             epubBook = ePub(url);
-            epubRendition = epubBook.renderTo("epub-viewer", { width: "100%", height: "100%", flow: "scrolled" });
+            // Volvemos al modo paginado clásico (por hojas) para que funcione el porcentaje y la separación por páginas
+            epubRendition = epubBook.renderTo("epub-viewer", { width: "100%", height: "100%", flow: "paginated" });
             
             epubRendition.display(posCfi || undefined).then(() => {
                 cambiarTema(document.getElementById('theme-selector').value);
