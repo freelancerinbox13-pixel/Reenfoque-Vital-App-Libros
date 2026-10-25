@@ -3,17 +3,18 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Lector Pro con Búsqueda - Telegram Mini App</title>
+    <title>Lector Pro Cloud Plus - Telegram Mini App</title>
     
     <!-- SDK de Telegram WebApp -->
     <script src="https://telegram.org/js/telegram-web-app.js"></script>
     
-    <!-- Dependencias para EPUB -->
+    <!-- Dependencias para EPUB y PDF -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.1.5/jszip.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/epubjs/dist/epub.min.js"></script>
-    
-    <!-- Dependencias para PDF -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.16.105/pdf.min.js"></script>
+    
+    <!-- Cliente de Supabase -->
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 
     <style>
         :root.theme-day {
@@ -54,6 +55,37 @@
             height: 100vh;
             overflow: hidden;
             transition: background-color 0.3s, color 0.3s;
+        }
+
+        #library-view {
+            flex: 1;
+            padding: 16px;
+            overflow-y: auto;
+            display: block;
+        }
+
+        .library-title {
+            font-size: 18px;
+            font-weight: bold;
+            margin-bottom: 12px;
+        }
+
+        .book-card {
+            background: var(--header-bg);
+            border: 1px solid var(--border-color);
+            padding: 12px;
+            border-radius: 8px;
+            margin-bottom: 10px;
+            cursor: pointer;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        #reader-view {
+            display: none;
+            flex-direction: column;
+            height: 100vh;
         }
 
         #header {
@@ -105,40 +137,73 @@
             white-space: pre-wrap;
             font-size: 16px;
             line-height: 1.6;
+            cursor: pointer;
         }
 
-        /* Botón flotante para destacar texto */
-        #highlight-btn {
+        /* Menú flotante al seleccionar texto */
+        #selection-menu {
             position: absolute;
             display: none;
-            background-color: #ffeb3b;
-            color: #333;
-            border: 1px solid #fbc02d;
-            padding: 6px 12px;
+            background: var(--header-bg);
+            border: 1px solid var(--border-color);
+            padding: 4px;
             border-radius: 20px;
-            font-weight: 600;
-            font-size: 12px;
-            cursor: pointer;
-            box-shadow: 0 4px 6px rgba(0,0,0,0.2);
+            box-shadow: 0 4px 12px rgba(0,0,0,0.2);
             z-index: 1000;
+            gap: 4px;
         }
 
-        /* Panel de búsqueda (Lupa) */
-        #search-modal {
+        .floating-btn {
+            background-color: var(--button-bg);
+            color: var(--button-text);
+            border: none;
+            padding: 6px 10px;
+            border-radius: 15px;
+            font-size: 11px;
+            cursor: pointer;
+        }
+
+        /* Modal de Zoom de Lectura */
+        #zoom-modal {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100vw;
+            height: 100vh;
+            background: var(--bg-color);
+            z-index: 4000;
+            padding: 24px;
+            box-sizing: border-box;
+            display: none;
+            flex-direction: column;
+            justify-content: space-between;
+        }
+
+        #zoom-content {
+            font-size: 24px;
+            line-height: 1.8;
+            overflow-y: auto;
+            flex: 1;
+            margin-bottom: 20px;
+        }
+
+        .modal {
             position: absolute;
             top: 50px;
             right: 10px;
-            width: 280px;
+            width: 300px;
             background: var(--header-bg);
             border: 1px solid var(--border-color);
             border-radius: 8px;
-            padding: 10px;
+            padding: 12px;
             box-shadow: 0 4px 12px rgba(0,0,0,0.15);
             display: none;
             z-index: 2000;
+            max-height: 70vh;
+            overflow-y: auto;
         }
 
-        #search-modal input {
+        .modal input {
             width: calc(100% - 16px);
             padding: 6px;
             margin-bottom: 8px;
@@ -148,24 +213,14 @@
             color: var(--text-color);
         }
 
-        #search-results {
-            max-height: 150px;
-            overflow-y: auto;
+        .item-row {
+            padding: 8px;
+            border-bottom: 1px solid var(--border-color);
             font-size: 12px;
         }
 
-        .search-result-item {
-            padding: 6px;
-            border-bottom: 1px solid var(--border-color);
-            cursor: pointer;
-        }
-
-        .search-result-item:hover {
-            opacity: 0.7;
-        }
-
         #nav-controls {
-            display: none;
+            display: flex;
             justify-content: space-between;
             padding: 10px 16px;
             background-color: var(--header-bg);
@@ -190,89 +245,161 @@
             border: 1px solid var(--border-color);
         }
 
-        button:active {
-            opacity: 0.8;
-        }
-
         #loading {
-            position: absolute;
+            position: fixed;
             top: 50%;
             left: 50%;
             transform: translate(-50%, -50%);
-            text-align: center;
-            font-size: 15px;
+            background: rgba(0,0,0,0.8);
+            color: #fff;
+            padding: 12px 20px;
+            border-radius: 8px;
+            font-size: 14px;
+            z-index: 3000;
+            display: none;
         }
     </style>
 </head>
 <body class="theme-day">
 
-    <div id="header">
-        <span id="book-title">Cargando lector...</span>
-        <div id="toolbar">
-            <button onclick="toggleSearchModal()">🔍 Lupa</button>
-            <select id="theme-selector" onchange="cambiarTema(this.value)">
-                <option value="day">☀️ Día</option>
-                <option value="night">🌙 Noche</option>
-                <option value="ebook">📖 Ebook</option>
-            </select>
-        </div>
+    <div id="loading">Cargando...</div>
+
+    <!-- VISTA BIBLIOTECA -->
+    <div id="library-view">
+        <div class="library-title">📚 Mi Biblioteca en la Nube</div>
+        <div id="books-list">Cargando libros...</div>
     </div>
 
-    <div id="loading">Preparando visor...</div>
-    
-    <div id="viewer-container">
-        <div id="epub-viewer"></div>
-        <div id="pdf-viewer" style="display:none;"><canvas id="pdf-canvas"></canvas></div>
-        <div id="txt-viewer" style="display:none;"></div>
+    <!-- VISTA LECTOR -->
+    <div id="reader-view">
+        <div id="header">
+            <button onclick="volverABiblioteca()">⬅ Biblioteca</button>
+            <span id="book-title">Lector</span>
+            <div id="toolbar">
+                <button onclick="toggleModal('search-modal')">🔍</button>
+                <button onclick="toggleModal('notes-modal')">📝</button>
+                <select id="theme-selector" onchange="cambiarTema(this.value)">
+                    <option value="day">☀️</option>
+                    <option value="night">🌙</option>
+                    <option value="ebook">📖</option>
+                </select>
+            </div>
+        </div>
         
-        <!-- Botón flotante de destacados -->
-        <button id="highlight-btn" onclick="guardarDestacado()">✨ Destacar</button>
+        <div id="viewer-container">
+            <div id="epub-viewer"></div>
+            <div id="pdf-viewer" style="display:none;"><canvas id="pdf-canvas"></canvas></div>
+            <div id="txt-viewer" style="display:none;" ondblclick="abrirZoom(this.innerText)"></div>
+            
+            <!-- Menú Flotante de Selección (Destacar, Traducir, Zoom) -->
+            <div id="selection-menu">
+                <button class="floating-btn" onclick="guardarDestacado()">✨ Destacar</button>
+                <button class="floating-btn" onclick="traducirTextoSelection()">🌐 Traducir</button>
+                <button class="floating-btn" onclick="abrirZoom(textoSeleccionadoActual)">🔍 Zoom</button>
+            </div>
 
-        <!-- Modal de Búsqueda (Lupa) -->
-        <div id="search-modal">
-            <input type="text" id="search-input" placeholder="Buscar palabra..." onkeypress="if(event.key === 'Enter') ejecutarBusqueda()">
-            <button onclick="ejecutarBusqueda()" style="width: 100%;">Buscar</button>
-            <div id="search-results"></div>
+            <!-- Modales -->
+            <div id="search-modal" class="modal">
+                <input type="text" id="search-input" placeholder="Buscar..." onkeypress="if(event.key === 'Enter') ejecutarBusqueda()">
+                <button onclick="ejecutarBusqueda()" style="width: 100%;">Buscar</button>
+                <div id="search-results" style="margin-top: 8px;"></div>
+            </div>
+
+            <div id="notes-modal" class="modal">
+                <div style="font-weight:bold; margin-bottom:6px;">Notas y Traducciones</div>
+                <div id="notes-list">Sin elementos.</div>
+            </div>
+        </div>
+
+        <div id="nav-controls">
+            <button id="prev-btn">Anterior</button>
+            <span id="page-info"></span>
+            <button id="next-btn">Siguiente</button>
         </div>
     </div>
 
-    <div id="nav-controls">
-        <button id="prev-btn">Anterior</button>
-        <button id="next-btn">Siguiente</button>
+    <!-- Modal de Zoom de Pantalla Completa -->
+    <div id="zoom-modal">
+        <div style="font-weight:bold; font-size:14px; margin-bottom:10px;">🔍 Vista Ampliada (Zoom)</div>
+        <div id="zoom-content"></div>
+        <button onclick="cerrarZoom()" style="padding: 12px; font-size:14px;">Cerrar Zoom</button>
     </div>
 
     <script>
         const tg = window.Telegram.WebApp;
         tg.expand();
 
-        const sampleUrl = "https://s3.amazonaws.com/epubjs/books/alice.epub"; 
+        const SUPABASE_URL = 'TUS_SUPABASE_URL';
+        const SUPABASE_ANON_KEY = 'TUS_SUPABASE_ANON_KEY';
+        const supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+        const userId = tg.initDataUnsafe.user ? tg.initDataUnsafe.user.id : 'usuario_demo';
+        let libroActualId = null;
         let epubBook, epubRendition;
         let pdfDoc = null, pageNum = 1, pdfScale = 1.2;
         let textoSeleccionadoActual = "";
 
-        async function initReader(fileUrl) {
+        async function cargarBiblioteca() {
             try {
-                document.getElementById('loading').style.display = 'block';
-                const extension = fileUrl.split('.').pop().toLowerCase().split('?')[0];
-
-                if (extension === 'epub') {
-                    initEpub(fileUrl);
-                } else if (extension === 'pdf') {
-                    initPdf(fileUrl);
-                } else if (extension === 'txt') {
-                    initTxt(fileUrl);
-                } else {
-                    throw new Error("Formato no soportado.");
+                showLoading(true);
+                const { data, error } = await supabaseClient.from('libros').select('id, titulo, epub_url');
+                if (error) throw error;
+                const listContainer = document.getElementById('books-list');
+                listContainer.innerHTML = '';
+                if (!data || data.length === 0) {
+                    listContainer.innerHTML = 'No hay libros disponibles.';
+                    showLoading(false);
+                    return;
                 }
-
-                document.getElementById('loading').style.display = 'none';
+                data.forEach(libro => {
+                    const card = document.createElement('div');
+                    card.className = 'book-card';
+                    card.innerHTML = `<span>📖 ${libro.titulo}</span> <button>Leer</button>`;
+                    card.onclick = () => abrirLibro(libro);
+                    listContainer.appendChild(card);
+                });
+                showLoading(false);
             } catch (err) {
                 console.error(err);
-                document.getElementById('loading').innerText = "Error al cargar el libro.";
+                document.getElementById('books-list').innerHTML = 'Error al cargar Supabase.';
+                showLoading(false);
             }
         }
 
-        // --- GESTIÓN DE TEMAS ---
+        async function abrirLibro(libro) {
+            libroActualId = libro.id;
+            document.getElementById('library-view').style.display = 'none';
+            document.getElementById('reader-view').style.display = 'flex';
+            document.getElementById('book-title').innerText = libro.titulo;
+
+            const extension = libro.epub_url.split('.').pop().toLowerCase().split('?')[0];
+            showLoading(true);
+
+            const { data: progresoData } = await supabaseClient
+                .from('progreso_lectura').select('posicion')
+                .eq('user_id', userId).eq('libro_id', libroActualId).single();
+
+            const posicionGuardada = progresoData ? progresoData.posicion : null;
+
+            if (extension === 'epub') initEpub(libro.epub_url, posicionGuardada);
+            else if (extension === 'pdf') initPdf(libro.epub_url, posicionGuardada ? parseInt(posicionGuardada) : 1);
+            else if (extension === 'txt') initTxt(libro.epub_url);
+            showLoading(false);
+        }
+
+        function volverABiblioteca() {
+            document.getElementById('reader-view').style.display = 'none';
+            document.getElementById('library-view').style.display = 'block';
+            cargarBiblioteca();
+        }
+
+        async function guardarProgresoEnNube(posicion) {
+            if (!libroActualId) return;
+            await supabaseClient.from('progreso_lectura').upsert({
+                user_id: userId, libro_id: libroActualId, posicion: String(posicion), updated_at: new Date()
+            }, { onConflict: 'user_id,libro_id' });
+        }
+
         function cambiarTema(themeName) {
             document.body.className = `theme-${themeName}`;
             if (epubRendition) {
@@ -286,137 +413,136 @@
             }
         }
 
-        // --- FUNCIONALIDAD DE BÚSQUEDA (LUPA) ---
-        function toggleSearchModal() {
-            const modal = document.getElementById('search-modal');
+        function toggleModal(modalId) {
+            const modal = document.getElementById(modalId);
             modal.style.display = modal.style.display === 'block' ? 'none' : 'block';
+            if (modalId === 'notes-modal') cargarNotasGuardadas();
         }
 
-        async function ejecutarBusqueda() {
-            const query = document.getElementById('search-input').value.trim();
-            const resultsContainer = document.getElementById('search-results');
-            resultsContainer.innerHTML = "Buscando...";
-
-            if (!query) {
-                resultsContainer.innerHTML = "Escribe una palabra.";
-                return;
-            }
-
-            if (epubBook) {
-                // Búsqueda integrada en EPUB.js
-                resultsContainer.innerHTML = "";
-                const results = await Promise.all(
-                    epubBook.spine.spineItems.map(item => 
-                        item.load(epubBook.load.bind(epubBook))
-                            .then(section => {
-                                const matches = section.find(query);
-                                item.unload();
-                                return matches;
-                            })
-                    )
-                );
-
-                const flattened = results.flat();
-                if (flattened.length === 0) {
-                    resultsContainer.innerHTML = "No se encontraron resultados.";
-                    return;
-                }
-
-                flattened.forEach(match => {
-                    const div = document.createElement('div');
-                    div.className = 'search-result-item';
-                    div.innerText = match.excerpt;
-                    div.onclick = () => {
-                        epubRendition.display(match.cfi);
-                        toggleSearchModal();
-                    };
-                    resultsContainer.appendChild(div);
-                });
-            } else {
-                resultsContainer.innerHTML = "Búsqueda disponible en formato EPUB.";
-            }
+        // --- ZOOM DE TEXTO ---
+        function abrirZoom(texto) {
+            if (!texto) return;
+            document.getElementById('zoom-content').innerText = texto;
+            document.getElementById('zoom-modal').style.display = 'flex';
+            document.getElementById('selection-menu').style.display = 'none';
         }
 
-        // --- DETECCIÓN DE SELECCIÓN DE TEXTO ---
-        document.addEventListener('mouseup', mostrarBotonDestacar);
-        document.addEventListener('touchend', mostrarBotonDestacar);
+        function cerrarZoom() {
+            document.getElementById('zoom-modal').style.display = 'none';
+        }
 
-        function mostrarBotonDestacar(e) {
-            const selection = window.getSelection();
-            const btn = document.getElementById('highlight-btn');
+        // --- TRADUCTOR INTEGRADO ---
+        async function traducirTextoSelection() {
+            if (!textoSeleccionadoActual) return;
+            try {
+                const res = await fetch(`https://api.mymemory.translated.net/get?q=${encodeURIComponent(textoSeleccionadoActual)}&langpair=en|es`);
+                const data = await res.json();
+                const traduccion = data.responseData.translatedText;
 
-            if (selection.toString().trim().length > 0) {
-                textoSeleccionadoActual = selection.toString();
-                const range = selection.getRangeAt(0);
-                const rect = range.getBoundingClientRect();
+                let destacados = JSON.parse(localStorage.getItem(`destacados_${libroActualId}`) || '[]');
+                destacados.push(`[Traducción]: ${textoSeleccionadoActual} ➔ ${traduccion}`);
+                localStorage.setItem(`destacados_${libroActualId}`, JSON.stringify(destacados));
 
-                btn.style.top = `${rect.top - 40 + window.scrollY}px`;
-                btn.style.left = `${rect.left + (rect.width / 2) - 40}px`;
-                btn.style.display = 'block';
-            } else {
-                if (e.target.id !== 'highlight-btn') {
-                    btn.style.display = 'none';
-                }
+                alert(`Traducción: ${traduccion}`);
+                document.getElementById('selection-menu').style.display = 'none';
+            } catch (err) {
+                alert("Error al conectar con el servicio de traducción.");
             }
         }
 
         function guardarDestacado() {
             if (!textoSeleccionadoActual) return;
-
-            let destacados = JSON.parse(localStorage.getItem('libros_destacados') || '[]');
+            let destacados = JSON.parse(localStorage.getItem(`destacados_${libroActualId}`) || '[]');
             destacados.push(textoSeleccionadoActual);
-            localStorage.setItem('libros_destacados', JSON.stringify(destacados));
-
-            alert("¡Párrafo destacado guardado con éxito!");
-            document.getElementById('highlight-btn').style.display = 'none';
-            window.getSelection().removeAllRanges();
+            localStorage.setItem(`destacados_${libroActualId}`, JSON.stringify(destacados));
+            alert("¡Guardado en Notas!");
+            document.getElementById('selection-menu').style.display = 'none';
         }
 
-        // --- EPUB RENDERER ---
-        function initEpub(url) {
+        function cargarNotasGuardadas() {
+            const container = document.getElementById('notes-list');
+            let destacados = JSON.parse(localStorage.getItem(`destacados_${libroActualId}`) || '[]');
+            if (destacados.length === 0) {
+                container.innerHTML = "Sin notas guardadas.";
+                return;
+            }
+            container.innerHTML = "";
+            destacados.forEach((nota, index) => {
+                const div = document.createElement('div');
+                div.className = 'item-row';
+                div.innerHTML = `${nota} <br><small style="color:red; cursor:pointer;" onclick="eliminarNota(${index})">[Borrar]</small>`;
+                container.appendChild(div);
+            });
+        }
+
+        function eliminarNota(index) {
+            let destacados = JSON.parse(localStorage.getItem(`destacados_${libroActualId}`) || '[]');
+            destacados.splice(index, 1);
+            localStorage.setItem(`destacados_${libroActualId}`, JSON.stringify(destacados));
+            cargarNotasGuardadas();
+        }
+
+        // --- DETECCIÓN DE SELECCIÓN ---
+        document.addEventListener('mouseup', mostrarMenuFlotante);
+        document.addEventListener('touchend', mostrarMenuFlotante);
+
+        function mostrarMenuFlotante(e) {
+            const selection = window.getSelection();
+            const menu = document.getElementById('selection-menu');
+            if (selection.toString().trim().length > 0) {
+                textoSeleccionadoActual = selection.toString();
+                const range = selection.getRangeAt(0);
+                const rect = range.getBoundingClientRect();
+                menu.style.top = `${rect.top - 50 + window.scrollY}px`;
+                menu.style.left = `${rect.left}px`;
+                menu.style.display = 'flex';
+            } else {
+                if (e.target.closest('#selection-menu') === null) {
+                    menu.style.display = 'none';
+                }
+            }
+        }
+
+        // --- RENDERIZADORES ---
+        function initEpub(url, posCfi) {
             document.getElementById('epub-viewer').style.display = 'block';
-            document.getElementById('nav-controls').style.display = 'flex';
-            document.getElementById('book-title').innerText = "Lector EPUB";
+            document.getElementById('pdf-viewer').style.display = 'none';
+            document.getElementById('txt-viewer').style.display = 'none';
 
             epubBook = ePub(url);
-            epubRendition = epubBook.renderTo("epub-viewer", {
-                width: "100%",
-                height: "100%"
-            });
-            epubRendition.display();
+            epubRendition = epubBook.renderTo("epub-viewer", { width: "100%", height: "100%" });
+            epubRendition.display(posCfi || undefined);
             cambiarTema(document.getElementById('theme-selector').value);
+
+            epubRendition.on("relocated", (location) => {
+                const percent = epubBook.locations.percentageFromCfi(location.start.cfi);
+                document.getElementById('page-info').innerText = Math.round(percent * 100) + '%';
+                guardarProgresoEnNube(location.start.cfi);
+            });
 
             epubRendition.on("selected", (cfiRange, contents) => {
                 textoSeleccionadoActual = contents.window.getSelection().toString();
-                const btn = document.getElementById('highlight-btn');
-                btn.style.display = 'block';
+                const menu = document.getElementById('selection-menu');
+                menu.style.display = 'flex';
             });
 
             document.getElementById('prev-btn').onclick = () => epubRendition.prev();
             document.getElementById('next-btn').onclick = () => epubRendition.next();
+            epubBook.locations.generate(1024);
         }
 
-        // --- PDF RENDERER ---
-        async function initPdf(url) {
+        async function initPdf(url, pageNumInit) {
             document.getElementById('pdf-viewer').style.display = 'flex';
-            document.getElementById('nav-controls').style.display = 'flex';
-            document.getElementById('book-title').innerText = "Lector PDF";
+            document.getElementById('epub-viewer').style.display = 'none';
+            document.getElementById('txt-viewer').style.display = 'none';
 
             pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.16.105/pdf.worker.min.js';
-            const loadingTask = pdfjsLib.getDocument(url);
-            pdfDoc = await loadingTask.promise;
+            pdfDoc = await pdfjsLib.getDocument(url).promise;
+            pageNum = pageNumInit || 1;
             renderPage(pageNum);
 
-            document.getElementById('prev-btn').onclick = () => {
-                if (pageNum <= 1) return;
-                pageNum--;
-                renderPage(pageNum);
-            };
-            document.getElementById('next-btn').onclick = () => {
-                if (pageNum >= pdfDoc.numPages) return;
-                pageNum++;
-                renderPage(pageNum);
-            };
+            document.getElementById('prev-btn').onclick = () => { if (pageNum > 1) { pageNum--; renderPage(pageNum); guardarProgresoEnNube(pageNum); } };
+            document.getElementById('next-btn').onclick = () => { if (pageNum < pdfDoc.numPages) { pageNum++; renderPage(pageNum); guardarProgresoEnNube(pageNum); } };
         }
 
         async function renderPage(num) {
@@ -424,25 +550,26 @@
             const canvas = document.getElementById('pdf-canvas');
             const ctx = canvas.getContext('2d');
             const viewport = page.getViewport({ scale: pdfScale });
-
             canvas.height = viewport.height;
             canvas.width = viewport.width;
-
             await page.render({ canvasContext: ctx, viewport: viewport }).promise;
             document.getElementById('page-info').innerText = `${num} / ${pdfDoc.numPages}`;
         }
 
-        // --- TXT RENDERER ---
         async function initTxt(url) {
             document.getElementById('txt-viewer').style.display = 'block';
-            document.getElementById('book-title').innerText = "Lector TXT";
-
+            document.getElementById('epub-viewer').style.display = 'none';
+            document.getElementById('pdf-viewer').style.display = 'none';
             const response = await fetch(url);
-            const text = await response.text();
-            document.getElementById('txt-viewer').innerText = text;
+            document.getElementById('txt-viewer').innerText = await response.text();
+            document.getElementById('page-info').innerText = "TXT";
         }
 
-        window.addEventListener('load', () => initReader(sampleUrl));
+        function showLoading(show) {
+            document.getElementById('loading').style.display = show ? 'block' : 'none';
+        }
+
+        window.addEventListener('load', cargarBiblioteca);
     </script>
 </body>
 </html>
