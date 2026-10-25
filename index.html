@@ -140,7 +140,7 @@
             cursor: pointer;
         }
 
-        /* Menú flotante al seleccionar texto */
+        /* Menú Flotante de Selección */
         #selection-menu {
             position: absolute;
             display: none;
@@ -219,6 +219,17 @@
             font-size: 12px;
         }
 
+        .search-result-item {
+            padding: 6px;
+            border-bottom: 1px solid var(--border-color);
+            cursor: pointer;
+            font-size: 12px;
+        }
+
+        .search-result-item:hover {
+            opacity: 0.7;
+        }
+
         #nav-controls {
             display: flex;
             justify-content: space-between;
@@ -291,20 +302,21 @@
             <div id="pdf-viewer" style="display:none;"><canvas id="pdf-canvas"></canvas></div>
             <div id="txt-viewer" style="display:none;" ondblclick="abrirZoom(this.innerText)"></div>
             
-            <!-- Menú Flotante de Selección (Destacar, Traducir, Zoom) -->
+            <!-- Menú Flotante de Selección -->
             <div id="selection-menu">
                 <button class="floating-btn" onclick="guardarDestacado()">✨ Destacar</button>
                 <button class="floating-btn" onclick="traducirTextoSelection()">🌐 Traducir</button>
                 <button class="floating-btn" onclick="abrirZoom(textoSeleccionadoActual)">🔍 Zoom</button>
             </div>
 
-            <!-- Modales -->
+            <!-- Modal de Búsqueda (Lupa) -->
             <div id="search-modal" class="modal">
                 <input type="text" id="search-input" placeholder="Buscar..." onkeypress="if(event.key === 'Enter') ejecutarBusqueda()">
                 <button onclick="ejecutarBusqueda()" style="width: 100%;">Buscar</button>
                 <div id="search-results" style="margin-top: 8px;"></div>
             </div>
 
+            <!-- Modal de Notas -->
             <div id="notes-modal" class="modal">
                 <div style="font-weight:bold; margin-bottom:6px;">Notas y Traducciones</div>
                 <div id="notes-list">Sin elementos.</div>
@@ -417,6 +429,51 @@
             const modal = document.getElementById(modalId);
             modal.style.display = modal.style.display === 'block' ? 'none' : 'block';
             if (modalId === 'notes-modal') cargarNotasGuardadas();
+        }
+
+        // --- MOTOR DE BÚSQUEDA (LUPA) ---
+        async function ejecutarBusqueda() {
+            const query = document.getElementById('search-input').value.trim();
+            const resultsContainer = document.getElementById('search-results');
+            resultsContainer.innerHTML = "Buscando...";
+
+            if (!query) {
+                resultsContainer.innerHTML = "Escribe una palabra.";
+                return;
+            }
+
+            if (epubBook) {
+                resultsContainer.innerHTML = "";
+                const results = await Promise.all(
+                    epubBook.spine.spineItems.map(item => 
+                        item.load(epubBook.load.bind(epubBook))
+                            .then(section => {
+                                const matches = section.find(query);
+                                item.unload();
+                                return matches;
+                            })
+                    )
+                );
+
+                const flattened = results.flat();
+                if (flattened.length === 0) {
+                    resultsContainer.innerHTML = "No se encontraron resultados.";
+                    return;
+                }
+
+                flattened.forEach(match => {
+                    const div = document.createElement('div');
+                    div.className = 'search-result-item';
+                    div.innerText = match.excerpt;
+                    div.onclick = () => {
+                        epubRendition.display(match.cfi);
+                        toggleModal('search-modal');
+                    };
+                    resultsContainer.appendChild(div);
+                });
+            } else {
+                resultsContainer.innerHTML = "Búsqueda disponible en formato EPUB.";
+            }
         }
 
         // --- ZOOM DE TEXTO ---
