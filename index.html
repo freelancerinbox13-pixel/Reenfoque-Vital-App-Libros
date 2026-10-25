@@ -117,6 +117,7 @@
         #epub-viewer {
             flex: 1;
             height: 100%;
+            transition: width 0.3s ease;
         }
 
         #pdf-viewer {
@@ -142,7 +143,7 @@
             width: 100%;
         }
 
-        /* Menú Flotante de Selección Corregido */
+        /* Menú Flotante de Selección Corregido y Claro */
         #selection-menu {
             position: fixed;
             display: none;
@@ -166,7 +167,7 @@
             font-weight: 600;
         }
 
-        /* Panel Lateral de Notas (Sidebar) para que no tape el libro */
+        /* Panel Lateral de Notas (Sidebar) limpio fuera del área del libro */
         #notes-sidebar {
             position: absolute;
             top: 0;
@@ -338,7 +339,7 @@
             <div id="pdf-viewer" style="display:none;"><canvas id="pdf-canvas"></canvas></div>
             <div id="txt-viewer" style="display:none;" ondblclick="abrirZoom(this.innerText)"></div>
             
-            <!-- Menú Flotante de Selección Corregido -->
+            <!-- Menú Flotante de Selección Actualizado -->
             <div id="selection-menu">
                 <button class="floating-btn" onclick="guardarDestacado()">✨ Destacar</button>
                 <button class="floating-btn" onclick="traducirTextoSelection()">🌐 Traducir</button>
@@ -352,7 +353,7 @@
                 <div id="search-results" style="margin-top: 8px;"></div>
             </div>
 
-            <!-- Panel Lateral (Sidebar) de Notas para no interrumpir la lectura -->
+            <!-- Panel Lateral de Notas -->
             <div id="notes-sidebar">
                 <div class="sidebar-header">
                     <span>📝 Mis Notas y Traducciones</span>
@@ -371,7 +372,7 @@
 
     <!-- Modal de Zoom -->
     <div id="zoom-modal">
-        <div style="font-weight:bold; font-size:14px; margin-bottom:10px;">🔍 Vista Ampliada (Zoom)</div>
+        <div style="font-weight:bold; font-size:14px; margin-bottom:10px;">🔍 Vista Ampliada (Zoom de Párrafo)</div>
         <div id="zoom-content"></div>
         <button onclick="cerrarZoom()" style="padding: 12px; font-size:14px;">Cerrar Zoom</button>
     </div>
@@ -393,6 +394,7 @@
         let epubBook, epubRendition;
         let pdfDoc = null, pageNum = 1, pdfScale = 1.2;
         let textoSeleccionadoActual = "";
+        let cfiRangeActual = null; // Para pintar el resaltado en EPUB
 
         const librosDemo = [
             { id: '1', titulo: 'Alicia en el País de las Maravillas (EPUB)', epub_url: 'https://s3.amazonaws.com/epubjs/books/alice.epub' }
@@ -488,10 +490,16 @@
             modal.style.display = modal.style.display === 'block' ? 'none' : 'block';
         }
 
+        // Abrir panel lateral y reajustar el visor para que no se mezcle el texto
         function toggleSidebar() {
             const sidebar = document.getElementById('notes-sidebar');
             sidebar.classList.toggle('open');
-            if (sidebar.classList.contains('open')) cargarNotasGuardadas();
+            if (sidebar.classList.contains('open')) {
+                cargarNotasGuardadas();
+            }
+            setTimeout(() => {
+                if (epubRendition) epubRendition.resize();
+            }, 300);
         }
 
         function abrirZoom(texto) {
@@ -524,12 +532,23 @@
             }
         }
 
+        // GUARDAR NOTA Y RESALTAR VISUALMENTE EN EL LIBRO
         function guardarDestacado() {
             if (!textoSeleccionadoActual) return;
+            
+            // 1. Guardar en notas locales
             let destacados = JSON.parse(localStorage.getItem(`destacados_${libroActualId}`) || '[]');
             destacados.push(`✨ ${textoSeleccionadoActual}`);
             localStorage.setItem(`destacados_${libroActualId}`, JSON.stringify(destacados));
-            alert("¡Guardado en Notas!");
+
+            // 2. Pintar / Resaltar visualmente sobre el libro EPUB si está activo
+            if (epubRendition && cfiRangeActual) {
+                epubRendition.annotations.add("highlight", cfiRangeActual, { "data-book-note": "true" }, (e) => {
+                    console.log("Nota resaltada clicada", e);
+                }, "highlight", { fill: "yellow", "fill-opacity": "0.3", mixBlendMode: "multiply" });
+            }
+
+            alert("¡Párrafo destacado y guardado en Notas!");
             document.getElementById('selection-menu').style.display = 'none';
             cargarNotasGuardadas();
         }
@@ -557,7 +576,6 @@
             cargarNotasGuardadas();
         }
 
-        // --- GESTIÓN DE SELECCIÓN DE TEXTO MEJORADA ---
         document.addEventListener('mouseup', mostrarMenuFlotante);
         document.addEventListener('touchend', mostrarMenuFlotante);
 
@@ -640,8 +658,9 @@
                 guardarProgresoEnNube(location.start.cfi);
             });
 
-            // Soporte de selección dentro del visor EPUB de ePub.js
+            // Capturar la selección y el rango CFI para poder resaltarlo visualmente
             epubRendition.on("selected", (cfiRange, contents) => {
+                cfiRangeActual = cfiRange;
                 textoSeleccionadoActual = contents.window.getSelection().toString();
                 const menu = document.getElementById('selection-menu');
                 const selection = contents.window.getSelection();
