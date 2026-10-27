@@ -6,7 +6,7 @@
 <meta name="color-scheme" content="light dark">
 <title>Lector Pro · Telegram</title>
 <script src="https://telegram.org/js/telegram-web-app.js"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js" onerror="this.onerror=null;this.src='https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js'"></script>
 <script src="https://cdn.jsdelivr.net/npm/epubjs@0.3.93/dist/epub.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.16.105/pdf.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
@@ -59,7 +59,8 @@ main{flex:1;min-height:0;position:relative}
 #selectionMenu .selection-drag-handle{display:flex;align-items:center;justify-content:center;min-width:28px;min-height:32px;padding:4px 7px;border-radius:7px;background:#3b424d;color:#fff;cursor:move;cursor:grab;touch-action:none;user-select:none;-webkit-user-select:none}
 #selectionMenu.dragging .selection-drag-handle{cursor:grabbing}
 #selectionMenu button{font-size:12px;padding:7px 8px;background:transparent;white-space:nowrap}
-#selectionMenu button:first-of-type{background:#ffeb3b;color:#111}
+#selectionMenu #highlightSelection{background:#ffeb3b;color:#111}
+#selectionMenu select{font-size:12px;max-width:94px;padding:7px 4px;border:1px solid #626b78;border-radius:7px;background:#303640;color:#fff}
 @media(max-width:420px){#selectionMenu{gap:3px;padding:5px}#selectionMenu button{font-size:11px;padding:8px 6px}#selectionMenu .selection-drag-handle{min-width:30px}}
 .note{padding:12px;margin:0 0 10px;background:var(--card);border:1px solid var(--line);border-radius:10px;overflow-wrap:anywhere}
 .note-head{display:flex;justify-content:space-between;gap:8px;align-items:center}
@@ -75,490 +76,1188 @@ main{flex:1;min-height:0;position:relative}
 </head>
 <body>
 <div class="app">
-<header><h1 id="appTitle">📚 Biblioteca</h1><nav class="nav"><button id="navLibrary" class="secondary">Libros</button><button id="navNotes" class="secondary">Notas</button></nav></header>
+<header>
+<h1 id="appTitle">📚 Biblioteca</h1>
+<nav class="nav">
+<button id="navLibrary" class="secondary">Libros</button>
+<button id="navNotes" class="secondary">Notas</button>
+</nav>
+</header>
 <div id="status" role="status"></div>
 <main>
 <section id="librarySection" class="section active">
-<div class="toolbar"><input id="searchBooks" type="search" placeholder="Buscar un libro…" aria-label="Buscar libros"><button id="reloadBooks" class="secondary">Actualizar</button></div>
+<div class="toolbar">
+<input id="searchBooks" type="search" placeholder="Buscar un libro…" aria-label="Buscar libros">
+<button id="reloadBooks" class="secondary">Actualizar</button>
+</div>
 <div id="bookList" class="grid"><p class="empty">Conectando con la biblioteca…</p></div>
 </section>
 <section id="readerSection" class="section">
 <div class="reader-tools">
-<button id="backLibrary" class="secondary">← Biblioteca</button><strong id="readerTitle">Lector</strong>
-<select id="themeSelect" aria-label="Tema"><option value="day">Día</option><option value="night">Noche</option><option value="ebook">E-book</option></select>
-<button id="zoomOut" class="secondary" aria-label="Reducir zoom">−</button><span id="zoomLabel" class="small">100%</span><button id="zoomIn" class="secondary" aria-label="Ampliar zoom">+</button>
+<button id="backLibrary" class="secondary">← Biblioteca</button>
+<strong id="readerTitle">Lector</strong>
+<select id="themeSelect" aria-label="Tema">
+<option value="day">Día</option>
+<option value="night">Noche</option>
+<option value="ebook">E-book</option>
+</select>
+<button id="zoomOut" class="secondary" aria-label="Reducir zoom">−</button>
+<span id="zoomLabel" class="small">100%</span>
+<button id="zoomIn" class="secondary" aria-label="Ampliar zoom">+</button>
 </div>
 <div id="viewerContainer"><div id="viewer"></div></div>
-<div class="reader-bottom"><button id="prevPage" class="secondary">Anterior</button><span id="progress" class="muted">Preparando…</span><button id="nextPage">Siguiente</button></div>
+<div class="reader-bottom">
+<button id="prevPage" class="secondary">Anterior</button>
+<span id="progress" class="muted">Preparando…</span>
+<button id="nextPage">Siguiente</button>
+</div>
 </section>
 <section id="notesSection" class="section">
-<h2>Notas, resaltados y traducciones</h2><p class="muted">Las anotaciones se guardan en este dispositivo. La sincronización entre dispositivos requiere activar el esquema de Supabase y configurar la autenticación.</p>
-<div class="toolbar"><input id="searchNotes" type="search" placeholder="Buscar en tus notas…" aria-label="Buscar notas"><button id="exportNotes" class="secondary">Exportar JSON</button></div>
+<h2>Notas, resaltados y traducciones</h2>
+<p class="muted">Las anotaciones se guardan en este dispositivo. La sincronización entre dispositivos requiere activar el esquema de Supabase y configurar la autenticación.</p>
+<div class="toolbar">
+<input id="searchNotes" type="search" placeholder="Buscar en tus notas…" aria-label="Buscar notas">
+<button id="exportNotes" class="secondary">Exportar JSON</button>
+</div>
 <div id="notesList"></div>
 </section>
 </main>
 </div>
+
 <div id="selectionMenu" aria-label="Acciones del texto seleccionado">
 <button id="selectionDragHandle" class="selection-drag-handle" type="button" aria-label="Mover menú flotante" title="Mantén pulsado para mover">⠿</button>
+<select id="highlightColor" aria-label="Color del resaltado" title="Color del resaltado">
+<option value="#ffeb3b">Amarillo</option>
+<option value="#8ee6a8">Verde</option>
+<option value="#8ecbff">Azul</option>
+<option value="#ff9ecb">Rosa</option>
+<option value="#ffc078">Naranja</option>
+<option value="#c7a6ff">Violeta</option>
+</select>
 <button id="highlightSelection" type="button">Resaltar</button>
 <button id="translateSelection" type="button">Traducir</button>
 <button id="noteSelection" type="button">Añadir nota</button>
 <button id="closeSelection" type="button" aria-label="Cerrar menú">✕</button>
 </div>
-<div id="dialogBackdrop" class="dialog-backdrop"><div class="dialog" role="dialog" aria-modal="true" aria-labelledby="dialogTitle"><h2 id="dialogTitle">Anotación</h2><p id="dialogOriginal" class="muted"></p><textarea id="dialogText" placeholder="Escribe una nota…"></textarea><div class="dialog-actions"><button id="dialogCancel" class="secondary">Cancelar</button><button id="dialogSave">Guardar</button></div></div></div>
+
+<div id="dialogBackdrop" class="dialog-backdrop">
+<div class="dialog" role="dialog" aria-modal="true" aria-labelledby="dialogTitle">
+<h2 id="dialogTitle">Anotación</h2>
+<p id="dialogOriginal" class="muted"></p>
+<textarea id="dialogText" placeholder="Escribe una nota…"></textarea>
+<div class="dialog-actions">
+<button id="dialogCancel" class="secondary">Cancelar</button>
+<button id="dialogSave">Guardar</button>
+</div>
+</div>
+</div>
+
 <script>
 (() => {
 'use strict';
+
 const tg = window.Telegram?.WebApp;
 try { tg?.ready(); tg?.expand(); } catch (_) {}
 
 const CONFIG = {
   supabaseUrl: 'https://augjyfnnzserfdoekkrp.supabase.co',
+  // Esta clave publicable se usa desde el navegador. Nunca pongas aquí una service_role key.
   supabaseAnonKey: 'sb_publishable_ed7WzU7SyteyxrAk5qE44w_N2vslpMU',
   translateEndpoint: ''
 };
+
 const $ = id => document.getElementById(id);
+
 const state = {
-  supabase: null, books: [], currentBook: null, format: null, book: null, rendition: null,
-  pdf: null, page: 1, scale: 1, selectedText: '', selectedAnchor: null, notes: [],
-  loadToken: 0, pendingAction: null, epubHighlights: [], locationsReady: false
+  supabase: null,
+  books: [],
+  currentBook: null,
+  format: null,
+  book: null,
+  rendition: null,
+  pdf: null,
+  page: 1,
+  scale: 1,
+  selectedText: '',
+  selectedAnchor: null,
+  notes: [],
+  loadToken: 0,
+  pendingAction: null,
+  epubHighlights: [],
+  locationsReady: false
 };
+
 const NOTES_KEY = 'reader_pro_notes_v1';
 const THEME_KEY = 'reader_pro_theme';
 const PROGRESS_PREFIX = 'reader_pro_progress_';
-const status = (message, show=true) => { $('status').textContent = message; $('status').style.display = show ? 'block' : 'none'; };
-function saveNotes() { try { localStorage.setItem(NOTES_KEY, JSON.stringify(state.notes)); } catch(e) { status('No se pudieron guardar las notas: almacenamiento lleno o bloqueado.'); } }
-function loadNotes() { try { const n = JSON.parse(localStorage.getItem(NOTES_KEY) || '[]'); state.notes = Array.isArray(n) ? n : []; } catch(_) { state.notes = []; } }
-function makeId() { return (crypto?.randomUUID?.() || `${Date.now()}-${Math.random().toString(16).slice(2)}`); }
+
+const status = (message, show=true) => {
+  $('status').textContent = message;
+  $('status').style.display = show ? 'block' : 'none';
+};
+
+function saveNotes() {
+  try {
+    localStorage.setItem(NOTES_KEY, JSON.stringify(state.notes));
+  } catch(e) {
+    status('No se pudieron guardar las notas: almacenamiento lleno o bloqueado.');
+  }
+}
+
+function loadNotes() {
+  try {
+    const n = JSON.parse(localStorage.getItem(NOTES_KEY) || '[]');
+    state.notes = Array.isArray(n) ? n : [];
+  } catch(_) {
+    state.notes = [];
+  }
+}
+
+function makeId() {
+  return (crypto?.randomUUID?.() || `${Date.now()}-${Math.random().toString(16).slice(2)}`);
+}
+
 function setSection(which) {
   ['librarySection','readerSection','notesSection'].forEach(id => $(id).classList.remove('active'));
   $(which).classList.add('active');
-  $('appTitle').textContent = which === 'librarySection' ? '📚 Biblioteca' : which === 'readerSection' ? '📖 Lector' : '📝 Mis anotaciones';
+  $('appTitle').textContent =
+    which === 'librarySection' ? '📚 Biblioteca' :
+    which === 'readerSection' ? '📖 Lector' : '📝 Mis anotaciones';
   hideSelectionMenu();
   if (which === 'notesSection') renderNotes();
 }
-function getBookId(book) { return String(book.id ?? book.url_archivo ?? book.titulo ?? 'unknown'); }
+
+function getBookId(book) {
+  return String(book.id ?? book.url_archivo ?? book.titulo ?? 'unknown');
+}
+
 function fileFormat(book) {
   const f = String(book.formato || book.format || book.tipo_archivo || book.mime_type || book.content_type || '').trim().toLowerCase();
-  if (f.includes('pdf')) return 'pdf';
+  if (f.includes('pdf') || f === 'application/pdf') return 'pdf';
   if (f.includes('epub')) return 'epub';
+
   const url = String(book.url_archivo || book.url || '');
   if (/\.pdf(?:$|[?#])/i.test(url)) return 'pdf';
   if (/\.epub(?:$|[?#])/i.test(url)) return 'epub';
   return '';
 }
+
 function safeUrl(url) {
-  try { const u = new URL(url, location.href); return ['https:','http:'].includes(u.protocol) ? u.href : ''; } catch(_) { return ''; }
+  try {
+    const u = new URL(url, location.href);
+    return ['https:','http:'].includes(u.protocol) ? u.href : '';
+  } catch(_) {
+    return '';
+  }
 }
+
 function addBookCard(book) {
-  const card = document.createElement('button'); card.className = 'book secondary'; card.type = 'button';
-  const cover = document.createElement('div'); cover.className = 'cover'; cover.textContent = '📖';
-  const title = document.createElement('h3'); title.textContent = book.titulo || 'Sin título';
-  const format = document.createElement('p'); format.className = 'muted'; format.textContent = fileFormat(book).toUpperCase() || 'Formato no indicado';
-  card.append(cover,title,format); card.addEventListener('click', () => openBook(book)); $('bookList').append(card);
+  const card = document.createElement('button');
+  card.className = 'book secondary';
+  card.type = 'button';
+
+  const cover = document.createElement('div');
+  cover.className = 'cover';
+  cover.textContent = '📖';
+
+  const title = document.createElement('h3');
+  title.textContent = book.titulo || 'Sin título';
+
+  const format = document.createElement('p');
+  format.className = 'muted';
+  format.textContent = fileFormat(book).toUpperCase() || 'Formato no indicado';
+
+  card.append(cover,title,format);
+  card.addEventListener('click', () => openBook(book));
+  $('bookList').append(card);
 }
+
 async function loadBooks() {
-  const list = $('bookList'); list.replaceChildren(); const p = document.createElement('p'); p.className='empty'; p.textContent='Cargando biblioteca…'; list.append(p);
-  if (!state.supabase) { p.textContent='No se pudo inicializar Supabase. Revisa la configuración.'; return; }
+  const list = $('bookList');
+  list.replaceChildren();
+
+  const p = document.createElement('p');
+  p.className = 'empty';
+  p.textContent = 'Cargando biblioteca…';
+  list.append(p);
+
+  if (!state.supabase) {
+    p.textContent = 'No se pudo inicializar Supabase. Revisa la configuración.';
+    return;
+  }
+
   try {
     const {data,error} = await state.supabase.from('libros').select('*').order('titulo', {ascending:true});
     if (error) throw error;
+
     state.books = Array.isArray(data) ? data : [];
     renderBooks();
+
     status(state.books.length ? `${state.books.length} libro(s) cargados.` : 'La tabla libros está vacía.', true);
-    if (!state.books.length) list.innerHTML = '<p class="empty">Todavía no hay libros en la tabla <code>libros</code>.</p>';
+
+    if (!state.books.length) {
+      list.innerHTML = '<p class="empty">Todavía no hay libros en la tabla <code>libros</code>.</p>';
+    }
   } catch(e) {
-    list.replaceChildren(); const err=document.createElement('p'); err.className='empty'; err.textContent=`Error al cargar la biblioteca: ${e.message || 'error desconocido'}`; list.append(err);
+    list.replaceChildren();
+    const err = document.createElement('p');
+    err.className = 'empty';
+    err.textContent = `Error al cargar la biblioteca: ${e.message || 'error desconocido'}`;
+    list.append(err);
   }
 }
+
 function renderBooks() {
-  const list=$('bookList'); list.replaceChildren();
-  const q=$('searchBooks').value.trim().toLocaleLowerCase();
-  const filtered=state.books.filter(b=>String(b.titulo||'').toLocaleLowerCase().includes(q));
-  if(!filtered.length){const p=document.createElement('p');p.className='empty';p.textContent='No hay libros que coincidan con la búsqueda.';list.append(p);return;}
+  const list = $('bookList');
+  list.replaceChildren();
+
+  const q = $('searchBooks').value.trim().toLocaleLowerCase();
+  const filtered = state.books.filter(b => String(b.titulo || '').toLocaleLowerCase().includes(q));
+
+  if (!filtered.length) {
+    const p = document.createElement('p');
+    p.className = 'empty';
+    p.textContent = 'No hay libros que coincidan con la búsqueda.';
+    list.append(p);
+    return;
+  }
+
   filtered.forEach(addBookCard);
 }
+
 function setTheme(theme) {
-  const allowed=['day','night','ebook']; if(!allowed.includes(theme)) theme='day';
-  document.documentElement.dataset.theme = theme==='day' ? 'day' : theme;
-  $('themeSelect').value=theme;
-  try { localStorage.setItem(THEME_KEY,theme); } catch(_) {}
+  const allowed = ['day','night','ebook'];
+  if (!allowed.includes(theme)) theme = 'day';
+
+  document.documentElement.dataset.theme = theme === 'day' ? 'day' : theme;
+  $('themeSelect').value = theme;
+
+  try {
+    localStorage.setItem(THEME_KEY,theme);
+  } catch(_) {}
+
   applyEpubTheme();
 }
+
 function applyEpubTheme() {
-  const theme=document.documentElement.dataset.theme || 'day';
-  const palette=theme==='night'
+  const theme = document.documentElement.dataset.theme || 'day';
+
+  const palette = theme === 'night'
     ? {bg:'#121418',fg:'#e9edf3',link:'#83bfff'}
-    : theme==='ebook'
+    : theme === 'ebook'
       ? {bg:'#f4ecd8',fg:'#2c221e',link:'#7b4d22'}
       : {bg:'#ffffff',fg:'#20242b',link:'#1769aa'};
 
-  if(state.rendition) {
+  if (state.rendition) {
     try {
       state.rendition.themes.default({
-        'html': {'background': `${palette.bg} !important`, 'color': `${palette.fg} !important`},
-        'body': {'background': `${palette.bg} !important`, 'color': `${palette.fg} !important`},
-        'p, div, span, li, h1, h2, h3, h4, h5, h6, blockquote, section, article': {'color': `${palette.fg} !important`},
+        'html': {
+          'background': `${palette.bg} !important`,
+          'color': `${palette.fg} !important`
+        },
+        'body': {
+          'background': `${palette.bg} !important`,
+          'color': `${palette.fg} !important`
+        },
+        'p, div, span, li, h1, h2, h3, h4, h5, h6, blockquote, section, article': {
+          'color': `${palette.fg} !important`
+        },
         'a': {'color': `${palette.link} !important`}
       });
 
-      const contents=state.rendition.getContents ? state.rendition.getContents() : [];
-      contents.forEach(content=>{
-        const doc=content.document;
-        if(!doc) return;
-        let style=doc.getElementById('lector-pro-theme-overrides');
-        if(!style) {
-          style=doc.createElement('style');
-          style.id='lector-pro-theme-overrides';
+      const contents = state.rendition.getContents ? state.rendition.getContents() : [];
+
+      contents.forEach(content => {
+        const doc = content.document;
+        if (!doc) return;
+
+        let style = doc.getElementById('lector-pro-theme-overrides');
+
+        if (!style) {
+          style = doc.createElement('style');
+          style.id = 'lector-pro-theme-overrides';
           (doc.head || doc.documentElement).appendChild(style);
         }
-        style.textContent=`
+
+        style.textContent = `
           html, body {
             background: ${palette.bg} !important;
-            color: ${palette.fg} !important;
-            color-scheme: ${theme==='night'?'dark':'light'} !important;
-          }
-          body, body * { color: ${palette.fg} !important; }
-          a, a * { color: ${palette.link} !important; }
-          body, body > div, body > section, body > article, body > main {
             background-color: ${palette.bg} !important;
+            color: ${palette.fg} !important;
+            color-scheme: ${theme === 'night' ? 'dark' : 'light'} !important;
           }
+          body, body *:not(img):not(svg):not(path):not(canvas) {
+            color: ${palette.fg} !important;
+            background-color: transparent !important;
+          }
+          html, body { background: ${palette.bg} !important; }
+          a, a * { color: ${palette.link} !important; }
         `;
+
         doc.documentElement.style.setProperty('background',palette.bg,'important');
         doc.documentElement.style.setProperty('color',palette.fg,'important');
-        if(doc.body){
+
+        if (doc.body) {
           doc.body.style.setProperty('background',palette.bg,'important');
           doc.body.style.setProperty('background-color',palette.bg,'important');
           doc.body.style.setProperty('color',palette.fg,'important');
         }
-        const frame=doc.defaultView?.frameElement;
-        if(frame) frame.style.backgroundColor=palette.bg;
+
+        const frame = doc.defaultView?.frameElement;
+        if (frame) frame.style.backgroundColor = palette.bg;
       });
-    } catch(e) { console.warn('No se pudieron aplicar los estilos al EPUB',e); }
+    } catch(e) {
+      console.warn('No se pudieron aplicar los estilos al EPUB',e);
+    }
   }
 
-  document.querySelectorAll('.pdf-page canvas').forEach(canvas=>{
-    canvas.style.filter=theme==='night'
+  document.querySelectorAll('.pdf-page canvas').forEach(canvas => {
+    canvas.style.filter = theme === 'night'
       ? 'invert(.9) hue-rotate(180deg)'
-      : theme==='ebook'
+      : theme === 'ebook'
         ? 'sepia(.75) saturate(.75) brightness(.88) contrast(.95)'
         : '';
   });
-  document.querySelectorAll('.pdf-page').forEach(page=>{
-    page.style.backgroundColor=theme==='ebook'?'#f4ecd8':theme==='night'?'#121418':'#ffffff';
+
+  document.querySelectorAll('.pdf-page').forEach(page => {
+    page.style.backgroundColor = theme === 'ebook' ? '#f4ecd8' : theme === 'night' ? '#121418' : '#ffffff';
   });
 }
+
 function showReader(book) {
-  setSection('readerSection'); $('readerTitle').textContent=book.titulo || 'Libro'; $('progress').textContent='Cargando…';
+  setSection('readerSection');
+  $('readerTitle').textContent = book.titulo || 'Libro';
+  $('progress').textContent = 'Cargando…';
 }
+
 async function closeCurrentDocument() {
   state.loadToken++;
+
   try { state.rendition?.destroy(); } catch(_) {}
-  state.rendition=null;
+  state.rendition = null;
+
   try { state.book?.destroy(); } catch(_) {}
-  state.book=null;
+  state.book = null;
+
   try { await state.pdf?.destroy(); } catch(_) {}
-  state.pdf=null; state.currentBook=null; state.format=null; state.selectedAnchor=null; state.selectedText='';
-  $('viewer').replaceChildren(); hideSelectionMenu();
+  state.pdf = null;
+
+  state.currentBook = null;
+  state.format = null;
+  state.selectedAnchor = null;
+  state.selectedText = '';
+
+  $('viewer').replaceChildren();
+  hideSelectionMenu();
 }
+
 async function openBook(book) {
-  const url=safeUrl(book.url_archivo);
-  const format=fileFormat(book);
-  if(!url){alert('Este libro no tiene una URL válida.');return;}
-  if(!format){alert('No puedo identificar el formato del libro. En Supabase, revisa que la columna formato contenga pdf o epub. La URL también debe apuntar al archivo correcto.');return;}
+  const url = safeUrl(book.url_archivo);
+  const format = fileFormat(book);
+
+  if (!url) {
+    alert('Este libro no tiene una URL válida.');
+    return;
+  }
+
+  if (!format) {
+    alert('No puedo identificar el formato del libro. En Supabase, revisa que la columna formato contenga pdf o epub. La URL también debe apuntar al archivo correcto.');
+    return;
+  }
+
   await closeCurrentDocument();
-  const token=state.loadToken; state.currentBook=book; state.format=format; state.scale=1;
-  $('zoomLabel').textContent='100%'; showReader(book); $('viewer').replaceChildren();
+
+  const token = state.loadToken;
+  state.currentBook = book;
+  state.format = format;
+  state.scale = 1;
+
+  $('zoomLabel').textContent = '100%';
+  showReader(book);
+  $('viewer').replaceChildren();
+
   try {
-    if(format==='epub') await loadEpub(url,token);
+    if (format === 'epub') await loadEpub(url,token);
     else await loadPdf(url,token);
   } catch(e) {
-    if(token!==state.loadToken)return;
-    console.error(e); $('viewer').replaceChildren();
-    const p=document.createElement('p');p.className='empty';p.textContent=`No se pudo abrir el documento: ${e.message || 'comprueba el archivo, CORS y la URL.'}`;$('viewer').append(p);
-    $('progress').textContent='Error de carga';
+    if (token !== state.loadToken) return;
+
+    console.error(e);
+    $('viewer').replaceChildren();
+
+    const p = document.createElement('p');
+    p.className = 'empty';
+    p.textContent = `No se pudo abrir el documento: ${e.message || 'comprueba el archivo, CORS y la URL.'}`;
+
+    $('viewer').append(p);
+    $('progress').textContent = 'Error de carga';
   }
 }
+
 async function loadEpub(url,token) {
-  if(typeof ePub!=='function') throw new Error('La biblioteca EPUB no se ha cargado. Comprueba la conexión y recarga la aplicación.');
-  if(typeof window.JSZip==='undefined') throw new Error('No se ha cargado JSZip. Comprueba la conexión e inténtalo de nuevo.');
+  if (typeof ePub !== 'function') {
+    throw new Error('La biblioteca EPUB no se ha cargado. Comprueba la conexión y recarga la aplicación.');
+  }
+
+  if (typeof window.JSZip === 'undefined' && typeof JSZip === 'undefined') {
+    throw new Error('No se ha cargado JSZip. Recarga la app; si continúa, revisa que la CDN jsdelivr.net o cdnjs.cloudflare.com no esté bloqueada.');
+  }
+
   let response;
-  try { response=await fetch(url,{method:'GET',mode:'cors',credentials:'omit',cache:'no-store'}); }
-  catch(err) { throw new Error(`No se pudo descargar el EPUB: ${err.message||'error de red'}. Revisa que la URL sea pública y que Supabase permita CORS desde Vercel.`); }
-  if(!response.ok) throw new Error(`Supabase respondió HTTP ${response.status} al descargar el EPUB. Revisa url_archivo y los permisos del bucket.`);
-  const bytes=await response.arrayBuffer();
-  if(token!==state.loadToken)return;
-  if(bytes.byteLength<4) throw new Error('El archivo EPUB está vacío o incompleto.');
-  const sig=new Uint8Array(bytes.slice(0,2));
-  if(sig[0]!==0x50 || sig[1]!==0x4b) throw new Error('El archivo descargado no parece ser un EPUB válido (ZIP). Revisa que url_archivo apunte al .epub y no a una página web.');
-  state.book=ePub(bytes);
-  state.rendition=state.book.renderTo('viewer',{width:'100%',height:'100%',flow:'paginated',spread:'none',allowScriptedContent:false});
-  state.rendition.on('selected',(cfi,contents)=>{
-    const text=contents?.window?.getSelection?.().toString().trim() || '';
-    if(!text)return;
-    state.selectedText=text; state.selectedAnchor={kind:'epub',cfi};
-    const rect=contents.window.getSelection().getRangeAt(0).getBoundingClientRect();
-    const iframe=contents.document.defaultView.frameElement;
-    const frameRect=iframe?.getBoundingClientRect();
-    showSelectionMenu((frameRect?.left||0)+rect.left,(frameRect?.top||0)+rect.top-52);
+
+  try {
+    response = await fetch(url,{
+      method:'GET',
+      mode:'cors',
+      credentials:'omit',
+      cache:'no-store'
+    });
+  } catch(err) {
+    throw new Error(`No se pudo descargar el EPUB: ${err.message || 'error de red'}. Revisa que la URL sea pública y que Supabase permita CORS desde Vercel.`);
+  }
+
+  if (!response.ok) {
+    throw new Error(`Supabase respondió HTTP ${response.status} al descargar el EPUB. Revisa url_archivo y los permisos del bucket.`);
+  }
+
+  const bytes = await response.arrayBuffer();
+  if (token !== state.loadToken) return;
+
+  if (bytes.byteLength < 4) {
+    throw new Error('El archivo EPUB está vacío o incompleto.');
+  }
+
+  const sig = new Uint8Array(bytes.slice(0,2));
+
+  if (sig[0] !== 0x50 || sig[1] !== 0x4b) {
+    throw new Error('El archivo descargado no parece ser un EPUB válido (ZIP). Revisa que url_archivo apunte al .epub y no a una página web.');
+  }
+
+  try {
+    const zipCheck = await JSZip.loadAsync(bytes.slice(0));
+
+    if (!zipCheck.file('META-INF/container.xml')) {
+      throw new Error('Falta META-INF/container.xml.');
+    }
+  } catch(zipError) {
+    throw new Error(`El archivo descargado no es un EPUB válido o está dañado: ${zipError.message || 'no se pudo leer el ZIP'}`);
+  }
+
+  if (token !== state.loadToken) return;
+
+  state.book = ePub(bytes);
+
+  state.rendition = state.book.renderTo('viewer',{
+    width:'100%',
+    height:'100%',
+    flow:'paginated',
+    spread:'none',
+    allowScriptedContent:false
   });
-  state.rendition.on('rendered',()=>applyEpubTheme());
-  state.rendition.on('relocated',loc=>{
-    if(token!==state.loadToken)return;
-    const cfi=loc?.start?.cfi;
-    $('prevPage').disabled=!!loc?.atStart;
-    $('nextPage').disabled=!!loc?.atEnd;
-    if(cfi){try{localStorage.setItem(PROGRESS_PREFIX+getBookId(state.currentBook),cfi)}catch(_){}}
-    if(state.locationsReady){
-      const pct=state.book.locations.percentageFromCfi(cfi);
-      if(Number.isFinite(pct))$('progress').textContent=`${Math.round(pct*100)}%`;
-    } else $('progress').textContent='Leyendo EPUB…';
+
+  state.rendition.on('selected',(cfi,contents) => {
+    const text = contents?.window?.getSelection?.().toString().trim() || '';
+    if (!text) return;
+
+    state.selectedText = text;
+    state.selectedAnchor = {kind:'epub',cfi};
+
+    const selection = contents.window.getSelection();
+    if (!selection || !selection.rangeCount) return;
+
+    const rect = selection.getRangeAt(0).getBoundingClientRect();
+    const iframe = contents.document.defaultView.frameElement;
+    const frameRect = iframe?.getBoundingClientRect();
+
+    showSelectionMenu(
+      (frameRect?.left || 0) + rect.left,
+      (frameRect?.top || 0) + rect.top - 52
+    );
   });
-  const saved=localStorage.getItem(PROGRESS_PREFIX+getBookId(state.currentBook));
+
+  state.rendition.on('rendered',() => applyEpubTheme());
+
+  state.rendition.on('relocated',loc => {
+    if (token !== state.loadToken) return;
+
+    const cfi = loc?.start?.cfi;
+
+    $('prevPage').disabled = !!loc?.atStart;
+    $('nextPage').disabled = !!loc?.atEnd;
+
+    if (cfi) {
+      try {
+        localStorage.setItem(PROGRESS_PREFIX + getBookId(state.currentBook),cfi);
+      } catch(_) {}
+    }
+
+    if (state.locationsReady) {
+      const pct = state.book.locations.percentageFromCfi(cfi);
+      if (Number.isFinite(pct)) $('progress').textContent = `${Math.round(pct*100)}%`;
+    } else {
+      $('progress').textContent = 'Leyendo EPUB…';
+    }
+  });
+
+  let saved = null;
+  try {
+    saved = localStorage.getItem(PROGRESS_PREFIX + getBookId(state.currentBook));
+  } catch(_) {}
+
   await state.book.ready;
-  if(token!==state.loadToken)return;
+  if (token !== state.loadToken) return;
+
   await state.rendition.display(saved || undefined);
   applyEpubTheme();
-  state.book.locations.generate(1000).then(()=>{
-    if(token!==state.loadToken)return;
-    state.locationsReady=true;
-    const loc=state.rendition.currentLocation();
-    const pct=loc?.start?.cfi ? state.book.locations.percentageFromCfi(loc.start.cfi) : 0;
-    $('progress').textContent=`${Math.round((Number.isFinite(pct)?pct:0)*100)}%`;
-  }).catch(e=>console.warn('No se pudieron generar ubicaciones',e));
+
+  state.book.locations.generate(1000).then(() => {
+    if (token !== state.loadToken) return;
+
+    state.locationsReady = true;
+
+    const loc = state.rendition.currentLocation();
+    const pct = loc?.start?.cfi ? state.book.locations.percentageFromCfi(loc.start.cfi) : 0;
+
+    $('progress').textContent = `${Math.round((Number.isFinite(pct) ? pct : 0)*100)}%`;
+  }).catch(e => console.warn('No se pudieron generar ubicaciones',e));
+
   await restoreEpubHighlights();
 }
+
 async function loadPdf(url,token) {
-  if(!window.pdfjsLib) throw new Error('PDF.js no se ha cargado. Comprueba tu conexión y vuelve a desplegar.');
-  pdfjsLib.GlobalWorkerOptions.workerSrc='https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.16.105/pdf.worker.min.js';
+  if (!window.pdfjsLib) {
+    throw new Error('PDF.js no se ha cargado. Comprueba tu conexión y vuelve a desplegar.');
+  }
+
+  pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.16.105/pdf.worker.min.js';
+
   let firstError;
+
   try {
-    state.pdf=await pdfjsLib.getDocument({url,withCredentials:false}).promise;
+    state.pdf = await pdfjsLib.getDocument({url,withCredentials:false}).promise;
   } catch(err) {
-    firstError=err;
+    firstError = err;
+
     try {
-      const response=await fetch(url,{method:'GET',mode:'cors',credentials:'omit',cache:'no-store'});
-      if(!response.ok) throw new Error(`Supabase respondió HTTP ${response.status} (${response.statusText}).`);
-      const bytes=await response.arrayBuffer();
-      if(bytes.byteLength<5) throw new Error('El archivo descargado está vacío o incompleto.');
-      const signature=new TextDecoder('ascii').decode(bytes.slice(0,5));
-      if(signature!=='%PDF-') throw new Error('El archivo de Supabase no parece ser un PDF válido. Revisa la URL y el archivo guardado.');
-      state.pdf=await pdfjsLib.getDocument({data:new Uint8Array(bytes)}).promise;
+      const response = await fetch(url,{
+        method:'GET',
+        mode:'cors',
+        credentials:'omit',
+        cache:'no-store'
+      });
+
+      if (!response.ok) {
+        throw new Error(`Supabase respondió HTTP ${response.status} (${response.statusText}).`);
+      }
+
+      const bytes = await response.arrayBuffer();
+
+      if (bytes.byteLength < 5) {
+        throw new Error('El archivo descargado está vacío o incompleto.');
+      }
+
+      const signature = new TextDecoder('ascii').decode(bytes.slice(0,5));
+
+      if (signature !== '%PDF-') {
+        throw new Error('El archivo de Supabase no parece ser un PDF válido. Revisa la URL y el archivo guardado.');
+      }
+
+      state.pdf = await pdfjsLib.getDocument({data:new Uint8Array(bytes)}).promise;
     } catch(secondError) {
-      const detail=secondError?.message || firstError?.message || 'error desconocido';
+      const detail = secondError?.message || firstError?.message || 'error desconocido';
+
       throw new Error(`No se pudo cargar el PDF. ${detail} Si aparece un error CORS, revisa los permisos del bucket Libros-bucket en Supabase. Si la URL da 404, corrige url_archivo. (PDF.js: ${firstError?.message || 'sin detalle'})`);
     }
   }
-  if(token!==state.loadToken)return;
-  if(!state.pdf || !state.pdf.numPages) throw new Error('El archivo no contiene páginas PDF legibles.');
-  const saved=Number(localStorage.getItem(PROGRESS_PREFIX+getBookId(state.currentBook))||1);
-  state.page=Math.max(1,Math.min(state.pdf.numPages,Number.isFinite(saved)?saved:1));
+
+  if (token !== state.loadToken) return;
+
+  if (!state.pdf || !state.pdf.numPages) {
+    throw new Error('El archivo no contiene páginas PDF legibles.');
+  }
+
+  let saved = 1;
+
+  try {
+    saved = Number(localStorage.getItem(PROGRESS_PREFIX + getBookId(state.currentBook)) || 1);
+  } catch(_) {}
+
+  state.page = Math.max(1,Math.min(state.pdf.numPages,Number.isFinite(saved) ? saved : 1));
+
   await renderPdfPage(state.page,token);
 }
+
 async function renderPdfPage(num,token=state.loadToken) {
-  if(!state.pdf)return;
-  num=Math.max(1,Math.min(state.pdf.numPages,Math.floor(num)));
-  state.page=num;
-  $('prevPage').disabled=num<=1;
-  $('nextPage').disabled=num>=state.pdf.numPages;
-  $('progress').textContent=`Página ${num} de ${state.pdf.numPages}`;
-  const page=await state.pdf.getPage(num);
-  if(token!==state.loadToken)return;
-  const container=$('viewer'); container.replaceChildren();
-  const base=page.getViewport({scale:1});
-  const available=Math.max(260,$('viewerContainer').clientWidth-20);
-  const fitScale=Math.min(1.5,available/base.width);
-  const scale=fitScale*state.scale;
-  const viewport=page.getViewport({scale});
-  const wrapper=document.createElement('div');wrapper.className='pdf-page';wrapper.style.width=`${viewport.width}px`;wrapper.style.height=`${viewport.height}px`;
-  const canvas=document.createElement('canvas');const ctx=canvas.getContext('2d',{alpha:false});
-  const dpr=Math.min(window.devicePixelRatio||1,2);
-  canvas.width=Math.floor(viewport.width*dpr);canvas.height=Math.floor(viewport.height*dpr);
-  canvas.style.width=`${viewport.width}px`;canvas.style.height=`${viewport.height}px`;
-  const textLayer=document.createElement('div');textLayer.className='textLayer';textLayer.style.width=`${viewport.width}px`;textLayer.style.height=`${viewport.height}px`;
-  wrapper.append(canvas,textLayer);container.append(wrapper);
-  await page.render({canvasContext:ctx,viewport,transform:dpr===1?null:[dpr,0,0,dpr,0,0]}).promise;
-  if(token!==state.loadToken)return;
-  const textContent=await page.getTextContent();
-  if(typeof pdfjsLib.renderTextLayer==='function') {
-    const task=pdfjsLib.renderTextLayer({textContent,container:textLayer,viewport,textDivs:[]});
-    if(task?.promise) await task.promise;
+  if (!state.pdf) return;
+
+  num = Math.max(1,Math.min(state.pdf.numPages,Math.floor(num)));
+  state.page = num;
+
+  $('prevPage').disabled = num <= 1;
+  $('nextPage').disabled = num >= state.pdf.numPages;
+  $('progress').textContent = `Página ${num} de ${state.pdf.numPages}`;
+
+  const page = await state.pdf.getPage(num);
+  if (token !== state.loadToken) return;
+
+  const container = $('viewer');
+  container.replaceChildren();
+
+  const base = page.getViewport({scale:1});
+  const available = Math.max(260,$('viewerContainer').clientWidth-20);
+  const fitScale = Math.min(1.5,available/base.width);
+  const scale = fitScale*state.scale;
+  const viewport = page.getViewport({scale});
+
+  const wrapper = document.createElement('div');
+  wrapper.className = 'pdf-page';
+  wrapper.style.width = `${viewport.width}px`;
+  wrapper.style.height = `${viewport.height}px`;
+
+  const canvas = document.createElement('canvas');
+  const ctx = canvas.getContext('2d',{alpha:false});
+  const dpr = Math.min(window.devicePixelRatio || 1,2);
+
+  canvas.width = Math.floor(viewport.width*dpr);
+  canvas.height = Math.floor(viewport.height*dpr);
+  canvas.style.width = `${viewport.width}px`;
+  canvas.style.height = `${viewport.height}px`;
+
+  const textLayer = document.createElement('div');
+  textLayer.className = 'textLayer';
+  textLayer.style.width = `${viewport.width}px`;
+  textLayer.style.height = `${viewport.height}px`;
+
+  wrapper.append(canvas,textLayer);
+  container.append(wrapper);
+
+  await page.render({
+    canvasContext:ctx,
+    viewport,
+    transform:dpr === 1 ? null : [dpr,0,0,dpr,0,0]
+  }).promise;
+
+  if (token !== state.loadToken) return;
+
+  const textContent = await page.getTextContent();
+
+  if (typeof pdfjsLib.renderTextLayer === 'function') {
+    const task = pdfjsLib.renderTextLayer({
+      textContent,
+      container:textLayer,
+      viewport,
+      textDivs:[]
+    });
+
+    if (task?.promise) await task.promise;
   }
-  if(token!==state.loadToken)return;
-  try{localStorage.setItem(PROGRESS_PREFIX+getBookId(state.currentBook),String(num));}catch(_){}
-  $('progress').textContent=`Página ${num} de ${state.pdf.numPages}`;
+
+  if (token !== state.loadToken) return;
+
+  try {
+    localStorage.setItem(PROGRESS_PREFIX + getBookId(state.currentBook),String(num));
+  } catch(_) {}
+
+  $('progress').textContent = `Página ${num} de ${state.pdf.numPages}`;
 }
+
 const MENU_POSITION_KEY = 'reader_pro_selection_menu_position_v1';
 let menuDrag = null;
+
 function clampMenuPosition(x,y) {
-  const menu=$('selectionMenu');
-  const w=menu.offsetWidth||280, h=menu.offsetHeight||44;
+  const menu = $('selectionMenu');
+  const w = menu.offsetWidth || 280;
+  const h = menu.offsetHeight || 44;
+
   return {
     x:Math.max(8,Math.min(Math.max(8,window.innerWidth-w-8),x)),
     y:Math.max(8,Math.min(Math.max(8,window.innerHeight-h-8),y))
   };
 }
+
 function applyMenuPosition(x,y,persist=false) {
-  const menu=$('selectionMenu'), pos=clampMenuPosition(x,y);
-  menu.style.left=`${pos.x}px`; menu.style.top=`${pos.y}px`;
-  menu.style.right='auto'; menu.style.bottom='auto';
-  if(persist){try{localStorage.setItem(MENU_POSITION_KEY,JSON.stringify(pos));}catch(_){}}
+  const menu = $('selectionMenu');
+  const pos = clampMenuPosition(x,y);
+
+  menu.style.left = `${pos.x}px`;
+  menu.style.top = `${pos.y}px`;
+  menu.style.right = 'auto';
+  menu.style.bottom = 'auto';
+
+  if (persist) {
+    try {
+      localStorage.setItem(MENU_POSITION_KEY,JSON.stringify(pos));
+    } catch(_) {}
+  }
 }
+
 function showSelectionMenu(x,y) {
-  const menu=$('selectionMenu');
-  menu.style.display='flex';
-  let saved=null;
-  try{saved=JSON.parse(localStorage.getItem(MENU_POSITION_KEY)||'null');}catch(_){}
-  requestAnimationFrame(()=>{
-    if(saved&&Number.isFinite(saved.x)&&Number.isFinite(saved.y)) applyMenuPosition(saved.x,saved.y);
-    else applyMenuPosition(x,y);
+  const menu = $('selectionMenu');
+  menu.style.display = 'flex';
+
+  let saved = null;
+
+  try {
+    saved = JSON.parse(localStorage.getItem(MENU_POSITION_KEY) || 'null');
+  } catch(_) {}
+
+  requestAnimationFrame(() => {
+    if (saved && Number.isFinite(saved.x) && Number.isFinite(saved.y)) {
+      applyMenuPosition(saved.x,saved.y);
+    } else {
+      applyMenuPosition(x,y);
+    }
   });
 }
-function hideSelectionMenu(){ $('selectionMenu').style.display='none'; }
-(function enableFloatingMenuDrag(){
-  const menu=$('selectionMenu'), handle=$('selectionDragHandle');
-  if(!menu||!handle)return;
-  handle.addEventListener('pointerdown',e=>{
-    if(e.button!==undefined&&e.button!==0)return;
-    const rect=menu.getBoundingClientRect();
-    menuDrag={pointerId:e.pointerId,startX:e.clientX,startY:e.clientY,left:rect.left,top:rect.top,moved:false};
-    try{handle.setPointerCapture(e.pointerId);}catch(_){}
+
+function hideSelectionMenu() {
+  $('selectionMenu').style.display = 'none';
+}
+
+(function enableFloatingMenuDrag() {
+  const menu = $('selectionMenu');
+  const handle = $('selectionDragHandle');
+
+  if (!menu || !handle) return;
+
+  handle.addEventListener('pointerdown',e => {
+    if (e.button !== undefined && e.button !== 0) return;
+
+    const rect = menu.getBoundingClientRect();
+
+    menuDrag = {
+      pointerId:e.pointerId,
+      startX:e.clientX,
+      startY:e.clientY,
+      left:rect.left,
+      top:rect.top,
+      moved:false
+    };
+
+    try {
+      handle.setPointerCapture(e.pointerId);
+    } catch(_) {}
+
     menu.classList.add('dragging');
     e.preventDefault();
   });
-  handle.addEventListener('pointermove',e=>{
-    if(!menuDrag||e.pointerId!==menuDrag.pointerId)return;
-    const dx=e.clientX-menuDrag.startX,dy=e.clientY-menuDrag.startY;
-    if(Math.abs(dx)+Math.abs(dy)>3)menuDrag.moved=true;
+
+  handle.addEventListener('pointermove',e => {
+    if (!menuDrag || e.pointerId !== menuDrag.pointerId) return;
+
+    const dx = e.clientX-menuDrag.startX;
+    const dy = e.clientY-menuDrag.startY;
+
+    if (Math.abs(dx)+Math.abs(dy) > 3) menuDrag.moved = true;
+
     applyMenuPosition(menuDrag.left+dx,menuDrag.top+dy);
     e.preventDefault();
   });
-  const endDrag=e=>{
-    if(!menuDrag|| (e.pointerId!==undefined&&e.pointerId!==menuDrag.pointerId))return;
-    if(menuDrag.moved){
-      const rect=menu.getBoundingClientRect();
+
+  const endDrag = e => {
+    if (!menuDrag || (e.pointerId !== undefined && e.pointerId !== menuDrag.pointerId)) return;
+
+    if (menuDrag.moved) {
+      const rect = menu.getBoundingClientRect();
       applyMenuPosition(rect.left,rect.top,true);
     }
-    menuDrag=null;menu.classList.remove('dragging');
+
+    menuDrag = null;
+    menu.classList.remove('dragging');
   };
+
   handle.addEventListener('pointerup',endDrag);
   handle.addEventListener('pointercancel',endDrag);
-  window.addEventListener('resize',()=>{
-    if(menu.style.display!=='none'){
-      const rect=menu.getBoundingClientRect();
+
+  window.addEventListener('resize',() => {
+    if (menu.style.display !== 'none') {
+      const rect = menu.getBoundingClientRect();
       applyMenuPosition(rect.left,rect.top);
     }
   });
 })();
-document.addEventListener('selectionchange',()=>{
-  if(state.format!=='pdf')return;
-  const sel=window.getSelection();const text=sel?.toString().trim();
-  if(!text)return;
-  const node=sel.anchorNode;
-  if(!node || !$('viewer').contains(node))return;
-  state.selectedText=text;
-  const range=sel.getRangeAt(0);const rect=range.getBoundingClientRect();
-  state.selectedAnchor={kind:'pdf',page:state.page,quote:text};
+
+document.addEventListener('selectionchange',() => {
+  if (state.format !== 'pdf') return;
+
+  const sel = window.getSelection();
+  const text = sel?.toString().trim();
+
+  if (!text) return;
+
+  const node = sel.anchorNode;
+  if (!node || !$('viewer').contains(node)) return;
+
+  state.selectedText = text;
+
+  const range = sel.getRangeAt(0);
+  const rect = range.getBoundingClientRect();
+
+  state.selectedAnchor = {
+    kind:'pdf',
+    page:state.page,
+    quote:text
+  };
+
   showSelectionMenu(rect.left,rect.top-48);
 });
+
 function createNote({type,text,original='',anchor=state.selectedAnchor,color=null}) {
-  state.notes.unshift({id:makeId(),bookId:getBookId(state.currentBook),bookTitle:state.currentBook?.titulo||'Libro desconocido',type,text,original,anchor,color,createdAt:new Date().toISOString()});
-  saveNotes();hideSelectionMenu();renderNotes();
-}
-async function restoreEpubHighlights() {
-  if(!state.rendition||!state.currentBook)return;
-  const id=getBookId(state.currentBook);
-  state.notes.filter(n=>n.bookId===id&&n.type==='Resaltado'&&n.anchor?.kind==='epub'&&n.anchor.cfi).forEach(n=>{
-    try{state.rendition.annotations.highlight(n.anchor.cfi,{},()=>{},'saved-highlight',{fill:n.color||'#ffeb3b','fill-opacity':'0.45'});}catch(e){console.warn('No se pudo restaurar un resaltado',e);}
+  state.notes.unshift({
+    id:makeId(),
+    bookId:getBookId(state.currentBook),
+    bookTitle:state.currentBook?.titulo || 'Libro desconocido',
+    type,
+    text,
+    original,
+    anchor,
+    color,
+    createdAt:new Date().toISOString()
   });
+
+  saveNotes();
+  hideSelectionMenu();
+  renderNotes();
 }
-$('highlightSelection').addEventListener('click',()=>{
-  if(!state.selectedText||!state.currentBook){alert('Selecciona primero un fragmento de texto.');return;}
-  const anchor=state.selectedAnchor?{...state.selectedAnchor}:{kind:state.format};
-  if(state.format==='epub'&&state.rendition&&anchor.cfi){
-    try{state.rendition.annotations.highlight(anchor.cfi,{},()=>{},'saved-highlight',{fill:'#ffeb3b','fill-opacity':'0.45'});}catch(e){console.warn(e);}
+
+function applyEpubHighlight(cfi,color) {
+  if (!state.rendition || !cfi) return false;
+
+  const safeColor = /^#[0-9a-f]{6}$/i.test(String(color || '')) ? color : '#ffeb3b';
+
+  try {
+    state.rendition.annotations.highlight(
+      cfi,
+      {color:safeColor},
+      () => {},
+      'saved-highlight',
+      {
+        fill:safeColor,
+        'fill-opacity':'0.58',
+        'mix-blend-mode':'multiply'
+      }
+    );
+
+    return true;
+  } catch(e) {
+    console.warn('No se pudo aplicar el resaltado EPUB',e);
+    return false;
   }
-  createNote({type:'Resaltado',text:state.selectedText,anchor,color:'#ffeb3b'});
-});
-$('noteSelection').addEventListener('click',()=>{
-  if(!state.selectedText||!state.currentBook){alert('Selecciona primero un fragmento de texto.');return;}
-  openDialog('Nota',state.selectedText,'',value=>createNote({type:'Nota',text:value,original:state.selectedText}));
-});
-$('translateSelection').addEventListener('click',async()=>{
-  const original=state.selectedText;
-  if(!original){alert('Selecciona primero un fragmento de texto.');return;}
-  hideSelectionMenu();
-  if(!CONFIG.translateEndpoint){status('La traducción real aún no está configurada. Despliega la Edge Function, configura el proveedor y añade su URL en CONFIG.translateEndpoint.');return;}
-  try{
-    status('Traduciendo…');
-    const res=await fetch(CONFIG.translateEndpoint,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({text:original,source:'auto',target:'es'})});
-    if(!res.ok)throw new Error(`Servicio de traducción: HTTP ${res.status}`);
-    const data=await res.json();const translated=String(data.translation||'').trim();
-    if(!translated)throw new Error('El servicio no devolvió una traducción.');
-    status('',false);
-    openDialog('Traducción',original,translated,value=>createNote({type:'Traducción',text:value,original}));
-  }catch(e){status(`No se pudo traducir: ${e.message}`);alert(`No se pudo traducir. ${e.message}`);}
-});
-function openDialog(title,original,value,onSave) {
-  state.pendingAction=onSave;$('dialogTitle').textContent=title;$('dialogOriginal').textContent=original||'';$('dialogText').value=value||'';$('dialogBackdrop').style.display='flex';$('dialogText').focus();
 }
-function closeDialog(){$('dialogBackdrop').style.display='none';state.pendingAction=null;}
+
+async function restoreEpubHighlights() {
+  if (!state.rendition || !state.currentBook) return;
+
+  const id = getBookId(state.currentBook);
+
+  state.notes
+    .filter(n =>
+      n.bookId === id &&
+      n.type === 'Resaltado' &&
+      n.anchor?.kind === 'epub' &&
+      n.anchor.cfi
+    )
+    .forEach(n => applyEpubHighlight(n.anchor.cfi,n.color || '#ffeb3b'));
+}
+
+$('highlightSelection').addEventListener('click',() => {
+  if (!state.selectedText || !state.currentBook) {
+    alert('Selecciona primero una palabra o un fragmento de texto dentro del libro.');
+    return;
+  }
+
+  const anchor = state.selectedAnchor ? {...state.selectedAnchor} : {kind:state.format};
+  const color = $('highlightColor')?.value || '#ffeb3b';
+
+  if (state.format === 'epub') {
+    if (!anchor.cfi) {
+      alert('No se pudo localizar el fragmento seleccionado en el EPUB. Vuelve a seleccionar el texto y pulsa Resaltar.');
+      return;
+    }
+
+    if (!applyEpubHighlight(anchor.cfi,color)) {
+      alert('No se pudo marcar el texto en esta página EPUB. Prueba seleccionando el texto de nuevo.');
+      return;
+    }
+  }
+
+  createNote({
+    type:'Resaltado',
+    text:state.selectedText,
+    anchor,
+    color
+  });
+
+  try {
+    const contents = state.rendition?.getContents?.() || [];
+    contents.forEach(c => c.window?.getSelection?.().removeAllRanges());
+  } catch(_) {}
+
+  window.getSelection?.()?.removeAllRanges?.();
+});
+
+$('noteSelection').addEventListener('click',() => {
+  if (!state.selectedText || !state.currentBook) {
+    alert('Selecciona primero un fragmento de texto.');
+    return;
+  }
+
+  const selected = state.selectedText;
+
+  openDialog('Nota',selected,'',value => createNote({
+    type:'Nota',
+    text:value,
+    original:selected
+  }));
+});
+
+$('translateSelection').addEventListener('click',async() => {
+  const original = state.selectedText;
+
+  if (!original) {
+    alert('Selecciona primero un fragmento de texto.');
+    return;
+  }
+
+  hideSelectionMenu();
+
+  if (!CONFIG.translateEndpoint) {
+    status('La traducción real aún no está configurada. Para activarla hay que desplegar un servicio de traducción y añadir su URL en CONFIG.translateEndpoint.');
+    return;
+  }
+
+  try {
+    status('Traduciendo…');
+
+    const res = await fetch(CONFIG.translateEndpoint,{
+      method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({text:original,source:'auto',target:'es'})
+    });
+
+    if (!res.ok) throw new Error(`Servicio de traducción: HTTP ${res.status}`);
+
+    const data = await res.json();
+    const translated = String(data.translation || '').trim();
+
+    if (!translated) throw new Error('El servicio no devolvió una traducción.');
+
+    status('',false);
+
+    openDialog('Traducción',original,translated,value => createNote({
+      type:'Traducción',
+      text:value,
+      original
+    }));
+  } catch(e) {
+    status(`No se pudo traducir: ${e.message}`);
+    alert(`No se pudo traducir. ${e.message}`);
+  }
+});
+
+function openDialog(title,original,value,onSave) {
+  state.pendingAction = onSave;
+  $('dialogTitle').textContent = title;
+  $('dialogOriginal').textContent = original || '';
+  $('dialogText').value = value || '';
+  $('dialogBackdrop').style.display = 'flex';
+  $('dialogText').focus();
+}
+
+function closeDialog() {
+  $('dialogBackdrop').style.display = 'none';
+  state.pendingAction = null;
+}
+
 $('dialogCancel').addEventListener('click',closeDialog);
-$('dialogBackdrop').addEventListener('click',e=>{if(e.target===$('dialogBackdrop'))closeDialog();});
-$('dialogSave').addEventListener('click',()=>{const cb=state.pendingAction;const value=$('dialogText').value.trim();if(!value){$('dialogText').focus();return;}closeDialog();if(cb)cb(value);});
+
+$('dialogBackdrop').addEventListener('click',e => {
+  if (e.target === $('dialogBackdrop')) closeDialog();
+});
+
+$('dialogSave').addEventListener('click',() => {
+  const cb = state.pendingAction;
+  const value = $('dialogText').value.trim();
+
+  if (!value) {
+    $('dialogText').focus();
+    return;
+  }
+
+  closeDialog();
+  if (cb) cb(value);
+});
+
 $('closeSelection').addEventListener('click',hideSelectionMenu);
-document.addEventListener('pointerdown',e=>{if(!$('selectionMenu').contains(e.target)&&!window.getSelection()?.toString().trim())hideSelectionMenu();});
-$('prevPage').addEventListener('click',async()=>{
-  hideSelectionMenu();
-  if(state.format==='epub'&&state.rendition){await state.rendition.prev();}
-  else if(state.format==='pdf'&&state.pdf&&state.page>1)await renderPdfPage(state.page-1);
+
+document.addEventListener('pointerdown',e => {
+  if (!$('selectionMenu').contains(e.target) && !window.getSelection()?.toString().trim()) {
+    hideSelectionMenu();
+  }
 });
-$('nextPage').addEventListener('click',async()=>{
+
+$('prevPage').addEventListener('click',async() => {
   hideSelectionMenu();
-  if(state.format==='epub'&&state.rendition){await state.rendition.next();}
-  else if(state.format==='pdf'&&state.pdf&&state.page<state.pdf.numPages)await renderPdfPage(state.page+1);
+
+  if (state.format === 'epub' && state.rendition) {
+    await state.rendition.prev();
+  } else if (state.format === 'pdf' && state.pdf && state.page > 1) {
+    await renderPdfPage(state.page-1);
+  }
 });
-$('zoomIn').addEventListener('click',async()=>{state.scale=Math.min(3,Math.round((state.scale+.2)*10)/10);$('zoomLabel').textContent=`${Math.round(state.scale*100)}%`;if(state.format==='pdf')await renderPdfPage(state.page);else if(state.rendition)state.rendition.themes.fontSize(`${Math.round(state.scale*100)}%`);});
-$('zoomOut').addEventListener('click',async()=>{state.scale=Math.max(.6,Math.round((state.scale-.2)*10)/10);$('zoomLabel').textContent=`${Math.round(state.scale*100)}%`;if(state.format==='pdf')await renderPdfPage(state.page);else if(state.rendition)state.rendition.themes.fontSize(`${Math.round(state.scale*100)}%`);});
-$('themeSelect').addEventListener('change',e=>setTheme(e.target.value));
-$('navLibrary').addEventListener('click',()=>setSection('librarySection'));
-$('navNotes').addEventListener('click',()=>setSection('notesSection'));
-$('backLibrary').addEventListener('click',async()=>{await closeCurrentDocument();setSection('librarySection');});
+
+$('nextPage').addEventListener('click',async() => {
+  hideSelectionMenu();
+
+  if (state.format === 'epub' && state.rendition) {
+    await state.rendition.next();
+  } else if (state.format === 'pdf' && state.pdf && state.page < state.pdf.numPages) {
+    await renderPdfPage(state.page+1);
+  }
+});
+
+$('zoomIn').addEventListener('click',async() => {
+  state.scale = Math.min(3,Math.round((state.scale+.2)*10)/10);
+  $('zoomLabel').textContent = `${Math.round(state.scale*100)}%`;
+
+  if (state.format === 'pdf') {
+    await renderPdfPage(state.page);
+  } else if (state.rendition) {
+    state.rendition.themes.fontSize(`${Math.round(state.scale*100)}%`);
+  }
+});
+
+$('zoomOut').addEventListener('click',async() => {
+  state.scale = Math.max(.6,Math.round((state.scale-.2)*10)/10);
+  $('zoomLabel').textContent = `${Math.round(state.scale*100)}%`;
+
+  if (state.format === 'pdf') {
+    await renderPdfPage(state.page);
+  } else if (state.rendition) {
+    state.rendition.themes.fontSize(`${Math.round(state.scale*100)}%`);
+  }
+});
+
+$('themeSelect').addEventListener('change',e => setTheme(e.target.value));
+$('navLibrary').addEventListener('click',() => setSection('librarySection'));
+$('navNotes').addEventListener('click',() => setSection('notesSection'));
+
+$('backLibrary').addEventListener('click',async() => {
+  await closeCurrentDocument();
+  setSection('librarySection');
+});
+
 $('reloadBooks').addEventListener('click',loadBooks);
 $('searchBooks').addEventListener('input',renderBooks);
 $('searchNotes').addEventListener('input',renderNotes);
+
 function renderNotes() {
-  const list=$('notesList');list.replaceChildren();
-  const q=$('searchNotes').value.trim().toLocaleLowerCase();
-  const items=state.notes.filter(n=>[n.bookTitle,n.type,n.text,n.original].join(' ').toLocaleLowerCase().includes(q));
-  if(!items.length){const p=document.createElement('p');p.className='empty';p.textContent='Todavía no hay anotaciones.';list.append(p);return;}
-  items.forEach(n=>{
-    const article=document.createElement('article');article.className='note';
-    const head=document.createElement('div');head.className='note-head';
-    const label=document.createElement('strong');label.textContent=`${n.type} · ${n.bookTitle||'Libro'}`;
-    const del=document.createElement('button');del.className='danger';del.textContent='Eliminar';del.addEventListener('click',()=>{
-      if(!confirm('¿Eliminar esta anotación?'))return;
-      state.notes=state.notes.filter(x=>x.id!==n.id);saveNotes();renderNotes();
+  const list = $('notesList');
+  list.replaceChildren();
+
+  const q = $('searchNotes').value.trim().toLocaleLowerCase();
+
+  const items = state.notes.filter(n =>
+    [n.bookTitle,n.type,n.text,n.original].join(' ').toLocaleLowerCase().includes(q)
+  );
+
+  if (!items.length) {
+    const p = document.createElement('p');
+    p.className = 'empty';
+    p.textContent = 'Todavía no hay anotaciones.';
+    list.append(p);
+    return;
+  }
+
+  items.forEach(n => {
+    const article = document.createElement('article');
+    article.className = 'note';
+
+    const head = document.createElement('div');
+    head.className = 'note-head';
+
+    const label = document.createElement('strong');
+    label.textContent = `${n.type} · ${n.bookTitle || 'Libro'}`;
+
+    const del = document.createElement('button');
+    del.className = 'danger';
+    del.textContent = 'Eliminar';
+
+    del.addEventListener('click',() => {
+      if (!confirm('¿Eliminar esta anotación?')) return;
+
+      state.notes = state.notes.filter(x => x.id !== n.id);
+      saveNotes();
+      renderNotes();
     });
-    head.append(label,del);const date=document.createElement('div');date.className='muted small';date.textContent=new Date(n.createdAt).toLocaleString();
+
+    head.append(label,del);
+
+    const date = document.createElement('div');
+    date.className = 'muted small';
+    date.textContent = new Date(n.createdAt).toLocaleString();
+
     article.append(head,date);
-    if(n.original){const orig=document.createElement('p');orig.textContent=`Original: ${n.original}`;article.append(orig);}
-    const text=document.createElement('p');text.textContent=n.text;article.append(text);list.append(article);
+
+    if (n.original) {
+      const orig = document.createElement('p');
+      orig.textContent = `Original: ${n.original}`;
+      article.append(orig);
+    }
+
+    const text = document.createElement('p');
+    text.textContent = n.text;
+
+    article.append(text);
+    list.append(article);
   });
 }
-$('exportNotes').addEventListener('click',()=>{
-  const blob=new Blob([JSON.stringify(state.notes,null,2)],{type:'application/json'});
-  const url=URL.createObjectURL(blob);const a=document.createElement('a');a.href=url;a.download='mis-anotaciones.json';document.body.append(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(url),1000);
+
+$('exportNotes').addEventListener('click',() => {
+  const blob = new Blob([JSON.stringify(state.notes,null,2)],{type:'application/json'});
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+
+  a.href = url;
+  a.download = 'mis-anotaciones.json';
+
+  document.body.append(a);
+  a.click();
+  a.remove();
+
+  setTimeout(() => URL.revokeObjectURL(url),1000);
 });
-window.addEventListener('resize',()=>{if(state.format==='pdf'&&state.pdf){clearTimeout(window.__pdfResizeTimer);window.__pdfResizeTimer=setTimeout(()=>renderPdfPage(state.page),180);}});
-window.addEventListener('beforeunload',()=>{try{state.rendition?.destroy();state.pdf?.destroy();}catch(_){}});
-loadNotes();
-try { setTheme(localStorage.getItem(THEME_KEY)||'day'); } catch(_) {setTheme('day');}
-try {
-  if(window.supabase?.createClient && CONFIG.supabaseUrl && CONFIG.supabaseAnonKey) {
-    state.supabase=window.supabase.createClient(CONFIG.supabaseUrl,CONFIG.supabaseAnonKey);
+
+window.addEventListener('resize',() => {
+  if (state.format === 'pdf' && state.pdf) {
+    clearTimeout(window.__pdfResizeTimer);
+    window.__pdfResizeTimer = setTimeout(() => renderPdfPage(state.page),180);
   }
-} catch(e) { console.error(e); }
+});
+
+window.addEventListener('beforeunload',() => {
+  try {
+    state.rendition?.destroy();
+    state.pdf?.destroy();
+  } catch(_) {}
+});
+
+loadNotes();
+
+try {
+  setTheme(localStorage.getItem(THEME_KEY) || 'day');
+} catch(_) {
+  setTheme('day');
+}
+
+try {
+  if (window.supabase?.createClient && CONFIG.supabaseUrl && CONFIG.supabaseAnonKey) {
+    state.supabase = window.supabase.createClient(CONFIG.supabaseUrl,CONFIG.supabaseAnonKey);
+  }
+} catch(e) {
+  console.error(e);
+}
+
 loadBooks();
 })();
 </script>
