@@ -99,16 +99,40 @@ main{flex:1;min-height:0;position:relative}
  text-overflow:ellipsis;white-space:nowrap
 }
 #viewerContainer{
- position:relative;flex:1;min-height:0;overflow:auto;
- background:var(--paper);overscroll-behavior:contain;
- -webkit-overflow-scrolling:touch;touch-action:pan-x pan-y
+ position:relative;flex:1;min-height:0;min-width:0;
+ overflow:auto;background:var(--paper);
+ overscroll-behavior:contain;
+ -webkit-overflow-scrolling:touch;
+ touch-action:pan-x pan-y;
 }
+
+/* Contenedor general del documento */
 #viewer{
  position:relative;min-height:100%;width:100%;
  background:var(--paper)
 }
-#viewer .epub-container{background:var(--paper)!important}
-#viewer iframe{border:0}
+
+/* Ajustes para EPUB: una sola columna en pantallas pequeñas */
+#viewer .epub-container{
+ background:var(--paper)!important;
+ width:100%!important;
+ height:100%!important;
+ max-width:100%!important;
+}
+
+/* El iframe del EPUB ocupa la pantalla disponible */
+#viewer iframe{
+ border:0!important;
+ display:block;
+ max-width:100%;
+}
+
+/* El contenido del EPUB mantiene su propio flujo de lectura */
+#viewer .epub-container iframe{
+ background:var(--paper)!important;
+}
+
+/* PDF */
 .pdf-page{
  position:relative;margin:12px auto;background:var(--paper);
  box-shadow:0 3px 12px #0002;line-height:0;flex-shrink:0;
@@ -143,6 +167,7 @@ main{flex:1;min-height:0;position:relative}
  user-select:text;-webkit-user-select:text
 }
 .textLayer ::selection{background:rgba(255,210,80,.45)}
+
 .reader-bottom{
  display:flex;justify-content:space-between;align-items:center;
  gap:8px;padding:8px 10px;background:var(--card);
@@ -195,6 +220,13 @@ main{flex:1;min-height:0;position:relative}
  border-radius:8px;padding:10px
 }
 .dialog-actions{display:flex;justify-content:flex-end;gap:8px;margin-top:12px}
+
+@media(max-width:759px){
+ #readerTitle{max-width:22vw}
+ .reader-tools{gap:5px}
+ .reader-tools button{padding:8px}
+ #viewerContainer{overscroll-behavior-x:contain;overscroll-behavior-y:contain}
+}
 @media(min-width:760px){
  .section{padding:22px}
  .reader-tools{padding:10px 14px}
@@ -310,7 +342,8 @@ const state={
  book:null,rendition:null,pdf:null,page:1,scale:1,
  selectedText:'',selectedAnchor:null,notes:[],
  loadToken:0,pendingAction:null,locationsReady:false,
- pdfRenderToken:0,selectionTimer:null
+ pdfRenderToken:0,selectionTimer:null,
+ epubResizeTimer:null
 };
 
 function status(message,show=true){
@@ -507,6 +540,9 @@ async function closeCurrentDocument(){
  $('viewer').replaceChildren();
  $('viewer').style.width='100%';
  $('viewer').style.height='100%';
+ $('viewerContainer').style.overflow='auto';
+ $('viewerContainer').scrollTop=0;
+ $('viewerContainer').scrollLeft=0;
  hideSelectionMenu();
 }
 
@@ -587,6 +623,38 @@ async function ensureEpubLibraries(){
  ]);
 }
 
+/*
+ * EPUB: viewport único, spread desactivado y dimensiones tomadas
+ * del área real del lector. Se evita fijar el ancho del visor a
+ * una medida anterior que pueda producir páginas dobles o recortes.
+ */
+function getEpubViewport(){
+ const container=$('viewerContainer');
+ return{
+  width:Math.max(260,Math.floor(container.clientWidth)),
+  height:Math.max(240,Math.floor(container.clientHeight))
+ };
+}
+
+function configureEpubViewport(){
+ const viewer=$('viewer');
+ const container=$('viewerContainer');
+ const size=getEpubViewport();
+
+ viewer.style.width='100%';
+ viewer.style.minWidth='0';
+ viewer.style.height=`${size.height}px`;
+ viewer.style.minHeight=`${size.height}px`;
+ viewer.style.overflow='hidden';
+
+ container.style.overflow='hidden';
+ container.style.overflowX='hidden';
+ container.style.overflowY='hidden';
+ container.style.touchAction='pan-y';
+
+ return size;
+}
+
 async function loadEpub(url,token){
  await ensureEpubLibraries();
  if(typeof window.ePub!=='function')throw new Error('EPUB.js no está disponible.');
@@ -617,15 +685,28 @@ async function loadEpub(url,token){
 
  if(token!==state.loadToken)return;
 
- const w=Math.max(280,$('viewerContainer').clientWidth);
- const h=Math.max(300,$('viewerContainer').clientHeight);
- $('viewer').style.width=`${w}px`;
- $('viewer').style.height=`${h}px`;
+ const size=configureEpubViewport();
 
  state.book=window.ePub(bytes);
+
  state.rendition=state.book.renderTo('viewer',{
-  width:w,height:h,flow:'paginated',spread:'none',manager:'default'
+  width:size.width,
+  height:size.height,
+  flow:'paginated',
+  spread:'none',
+  manager:'default',
+  minSpreadWidth:2000,
+  allowScriptedContent:false
  });
+
+ /* Forzar una sola vista y evitar que el contenido se divida
+    en dos páginas colocadas una junto a otra en el móvil. */
+ try{
+  state.rendition.spread('none');
+  state.rendition.flow('paginated');
+ }catch(e){
+  console.warn('No se pudieron aplicar todos los ajustes de paginación EPUB:',e);
+ }
 
  state.rendition.on('displayError',error=>{
   console.error('EPUB displayError:',error);
@@ -635,6 +716,7 @@ async function loadEpub(url,token){
  state.rendition.on('rendered',()=>{
   applyReaderTheme();
   restoreEpubHighlights();
+  enforceEpubFrameLayout();
  });
 
  state.rendition.on('selected',(cfi,contents)=>{
@@ -678,8 +760,14 @@ async function loadEpub(url,token){
  await state.rendition.display(saved||undefined);
  if(token!==state.loadToken)return;
 
+ configureEpubViewport();
+ try{
+  const currentSize=getEpubViewport();
+  state.rendition.resize(currentSize.width,currentSize.height);
+ }catch(e){console.warn('No se pudo ajustar el tamaño inicial EPUB:',e)}
+
  applyReaderTheme();
- resizeReader();
+ enforceEpubFrameLayout();
 
  try{
   await state.book.locations.generate(1000);
@@ -696,13 +784,90 @@ async function loadEpub(url,token){
  restoreEpubHighlights();
 }
 
+/*
+ * Ajusta el iframe generado por EPUB.js. El tamaño se limita al
+ * área visible y las columnas del documento se mantienen dentro
+ * de una sola pantalla.
+ */
+function enforceEpubFrameLayout(){
+ if(!state.rendition)return;
+
+ const p=themeColors();
+ const size=getEpubViewport();
+
+ try{
+  const contents=state.rendition.getContents?.()||[];
+
+  contents.forEach(c=>{
+   const doc=c.document;
+   const frame=c.window?.frameElement;
+   if(!doc)return;
+
+   if(frame){
+    frame.style.setProperty('width',size.width+'px','important');
+    frame.style.setProperty('height',size.height+'px','important');
+    frame.style.setProperty('max-width','100%','important');
+    frame.style.setProperty('border','0','important');
+    frame.style.setProperty('display','block','important');
+   }
+
+   let style=doc.getElementById('reader-epub-layout-fix');
+   if(!style){
+    style=doc.createElement('style');
+    style.id='reader-epub-layout-fix';
+    (doc.head||doc.documentElement).appendChild(style);
+   }
+
+   style.textContent=`
+    html{
+      width:100%!important;
+      max-width:100%!important;
+      height:100%!important;
+      overflow:hidden!important;
+      background:${p.bg}!important;
+      column-count:auto!important;
+    }
+    body{
+      box-sizing:border-box!important;
+      max-width:100%!important;
+      min-height:0!important;
+      margin:0!important;
+      background:${p.bg}!important;
+      color:${p.fg}!important;
+      overflow-wrap:break-word!important;
+      word-wrap:break-word!important;
+    }
+    img,svg,video,canvas{
+      max-width:100%!important;
+      height:auto;
+    }
+    pre,table{
+      max-width:100%!important;
+    }
+    ::selection{background:rgba(150,190,230,.4)}
+   `;
+  });
+ }catch(e){
+  console.warn('No se pudo ajustar el contenido interno del EPUB:',e);
+ }
+}
+
 function resizeReader(){
  if(state.format==='epub'&&state.rendition){
-  const w=Math.max(280,$('viewerContainer').clientWidth);
-  const h=Math.max(300,$('viewerContainer').clientHeight);
-  $('viewer').style.width=`${w}px`;
-  $('viewer').style.height=`${h}px`;
-  try{state.rendition.resize(w,h)}catch(e){console.warn('Resize EPUB:',e)}
+  const size=configureEpubViewport();
+
+  try{
+   state.rendition.resize(size.width,size.height);
+  }catch(e){
+   console.warn('Resize EPUB:',e);
+  }
+
+  setTimeout(()=>{
+   if(!state.rendition)return;
+   enforceEpubFrameLayout();
+   applyReaderTheme();
+   restoreEpubHighlights();
+  },100);
  }
 }
 
@@ -711,32 +876,43 @@ async function setEpubZoom(){
 
  const rendition=state.rendition;
  let currentCfi=null;
+
  try{
   const loc=rendition.currentLocation();
   currentCfi=loc?.start?.cfi||null;
  }catch(_){}
 
  const percentage=`${Math.round(state.scale*100)}%`;
- try{rendition.themes.fontSize(percentage)}
- catch(e){console.warn('No se pudo cambiar el tamaño EPUB:',e)}
+
+ try{
+  rendition.themes.fontSize(percentage);
+ }catch(e){
+  console.warn('No se pudo cambiar el tamaño EPUB:',e);
+ }
 
  await new Promise(resolve=>setTimeout(resolve,180));
  if(rendition!==state.rendition)return;
 
- const w=Math.max(280,$('viewerContainer').clientWidth);
- const h=Math.max(300,$('viewerContainer').clientHeight);
- $('viewer').style.width=`${w}px`;
- $('viewer').style.height=`${h}px`;
+ const size=configureEpubViewport();
 
- try{rendition.resize(w,h)}catch(e){console.warn('Resize EPUB:',e)}
+ try{
+  rendition.resize(size.width,size.height);
+ }catch(e){
+  console.warn('Resize EPUB:',e);
+ }
+
  await new Promise(resolve=>setTimeout(resolve,120));
  if(rendition!==state.rendition)return;
 
  if(currentCfi){
-  try{await rendition.display(currentCfi)}
-  catch(e){console.warn('No se pudo recuperar la posición EPUB:',e)}
+  try{
+   await rendition.display(currentCfi);
+  }catch(e){
+   console.warn('No se pudo recuperar la posición EPUB:',e);
+  }
  }
 
+ enforceEpubFrameLayout();
  applyReaderTheme();
  restoreEpubHighlights();
 }
@@ -1250,6 +1426,12 @@ function renderNotes(){
    saveNotes();
    renderNotes();
    if(state.format==='pdf'&&state.pdf)restorePdfHighlights(state.page);
+   if(state.format==='epub'&&state.rendition){
+    try{
+     state.rendition.annotations.remove(n.anchor?.cfi,'highlight');
+     restoreEpubHighlights();
+    }catch(_){}
+   }
   });
 
   head.append(label,del);
@@ -1288,12 +1470,31 @@ window.addEventListener('resize',()=>{
    const rendition=state.rendition;
    let cfi=null;
    try{cfi=rendition?.currentLocation()?.start?.cfi||null}catch(_){}
-   resizeReader();
-   if(rendition&&cfi){
-    setTimeout(()=>{if(rendition===state.rendition)rendition.display(cfi).catch(()=>{})},120);
+
+   if(!rendition)return;
+
+   const size=configureEpubViewport();
+
+   try{
+    rendition.resize(size.width,size.height);
+   }catch(e){
+    console.warn('No se pudo redimensionar EPUB:',e);
    }
+
+   setTimeout(async()=>{
+    if(rendition!==state.rendition)return;
+
+    if(cfi){
+     try{await rendition.display(cfi)}catch(_){}
+    }
+
+    enforceEpubFrameLayout();
+    applyReaderTheme();
+    restoreEpubHighlights();
+   },150);
   },180);
  }
+
  if(state.format==='pdf'&&state.pdf){
   clearTimeout(window.__pdfResizeTimer);
   window.__pdfResizeTimer=setTimeout(()=>renderPdfPage(state.page),200);
