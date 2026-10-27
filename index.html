@@ -1,3 +1,4 @@
+
 <!doctype html>
 <html lang="es">
 <head>
@@ -5,6 +6,7 @@
 <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
 <meta name="color-scheme" content="light dark">
 <title>Lector Pro · Telegram</title>
+
 <script src="https://telegram.org/js/telegram-web-app.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.16.105/pdf.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
@@ -103,36 +105,22 @@ main{flex:1;min-height:0;position:relative}
  overflow:auto;background:var(--paper);
  overscroll-behavior:contain;
  -webkit-overflow-scrolling:touch;
- touch-action:pan-x pan-y;
 }
-
-/* Contenedor general del documento */
 #viewer{
  position:relative;min-height:100%;width:100%;
  background:var(--paper)
 }
 
-/* Ajustes para EPUB: una sola columna en pantallas pequeñas */
+/* EPUB: dejar que epub.js controle sus columnas y sus páginas */
 #viewer .epub-container{
- background:var(--paper)!important;
- width:100%!important;
- height:100%!important;
- max-width:100%!important;
-}
-
-/* El iframe del EPUB ocupa la pantalla disponible */
-#viewer iframe{
- border:0!important;
- display:block;
+ background:var(--paper);
  max-width:100%;
 }
-
-/* El contenido del EPUB mantiene su propio flujo de lectura */
-#viewer .epub-container iframe{
- background:var(--paper)!important;
+#viewer iframe{
+ border:0!important;
 }
 
-/* PDF */
+/* PDF: la página nueva se prepara antes de sustituir la anterior */
 .pdf-page{
  position:relative;margin:12px auto;background:var(--paper);
  box-shadow:0 3px 12px #0002;line-height:0;flex-shrink:0;
@@ -142,7 +130,7 @@ main{flex:1;min-height:0;position:relative}
 .pdf-paper-tint{
  position:absolute;inset:0;z-index:1;
  pointer-events:none;display:none;
- background:rgba(243,234,213,.78);
+ background:rgba(243,234,213,.65);
  mix-blend-mode:multiply
 }
 .pdf-highlight-layer{
@@ -167,7 +155,6 @@ main{flex:1;min-height:0;position:relative}
  user-select:text;-webkit-user-select:text
 }
 .textLayer ::selection{background:rgba(255,210,80,.45)}
-
 .reader-bottom{
  display:flex;justify-content:space-between;align-items:center;
  gap:8px;padding:8px 10px;background:var(--card);
@@ -220,12 +207,10 @@ main{flex:1;min-height:0;position:relative}
  border-radius:8px;padding:10px
 }
 .dialog-actions{display:flex;justify-content:flex-end;gap:8px;margin-top:12px}
-
 @media(max-width:759px){
  #readerTitle{max-width:22vw}
  .reader-tools{gap:5px}
  .reader-tools button{padding:8px}
- #viewerContainer{overscroll-behavior-x:contain;overscroll-behavior-y:contain}
 }
 @media(min-width:760px){
  .section{padding:22px}
@@ -342,24 +327,21 @@ const state={
  book:null,rendition:null,pdf:null,page:1,scale:1,
  selectedText:'',selectedAnchor:null,notes:[],
  loadToken:0,pendingAction:null,locationsReady:false,
- pdfRenderToken:0,selectionTimer:null,
- epubResizeTimer:null
+ pdfRenderToken:0,pdfRenderTask:null,selectionTimer:null,
+ epubResizeTimer:null,epubNavigationBusy:false
 };
 
 function status(message,show=true){
  $('status').textContent=message;
  $('status').style.display=show?'block':'none';
 }
-
 function makeId(){
  return window.crypto?.randomUUID?.()||
   `${Date.now()}-${Math.random().toString(16).slice(2)}`;
 }
-
 function getBookId(book){
  return String(book?.id??book?.url_archivo??book?.titulo??'unknown');
 }
-
 function fileFormat(book){
  const f=String(book.formato||book.format||book.tipo_archivo||book.mime_type||'').toLowerCase();
  const url=String(book.url_archivo||book.url||'');
@@ -367,38 +349,30 @@ function fileFormat(book){
  if(f.includes('epub')||/\.epub(?:$|[?#])/i.test(url))return'epub';
  return'';
 }
-
 function safeUrl(url){
  try{
   const u=new URL(url,location.href);
   return['https:','http:'].includes(u.protocol)?u.href:'';
  }catch(_){return''}
 }
-
 function loadNotes(){
  try{
   const n=JSON.parse(localStorage.getItem(NOTES_KEY)||'[]');
   state.notes=Array.isArray(n)?n:[];
  }catch(_){state.notes=[]}
 }
-
 function saveNotes(){
- try{
-  localStorage.setItem(NOTES_KEY,JSON.stringify(state.notes));
- }catch(_){
-  status('No se pudieron guardar las notas en este dispositivo. Comprueba el espacio disponible.');
- }
+ try{localStorage.setItem(NOTES_KEY,JSON.stringify(state.notes))}
+ catch(_){status('No se pudieron guardar las notas en este dispositivo. Comprueba el espacio disponible.')}
 }
-
 function setSection(id){
  ['librarySection','readerSection','notesSection'].forEach(x=>$(x).classList.remove('active'));
  $(id).classList.add('active');
  $('appTitle').textContent=id==='librarySection'?'📚 Biblioteca':id==='readerSection'?'📖 Lector':'📝 Mis anotaciones';
  hideSelectionMenu();
  if(id==='notesSection')renderNotes();
- if(id==='readerSection')setTimeout(resizeReader,100);
+ if(id==='readerSection')setTimeout(resizeReader,150);
 }
-
 function addBookCard(book){
  const card=document.createElement('button');
  card.className='book';card.type='button';
@@ -413,7 +387,6 @@ function addBookCard(book){
  card.addEventListener('click',()=>openBook(book));
  $('bookList').append(card);
 }
-
 async function loadBooks(){
  const list=$('bookList');list.replaceChildren();
  const p=document.createElement('p');p.className='empty';
@@ -433,7 +406,6 @@ async function loadBooks(){
   status('Error de Supabase.');
  }
 }
-
 function renderBooks(){
  const list=$('bookList');list.replaceChildren();
  const q=$('searchBooks').value.trim().toLocaleLowerCase();
@@ -445,14 +417,12 @@ function renderBooks(){
  }
  filtered.forEach(addBookCard);
 }
-
 function themeColors(){
  const theme=document.documentElement.dataset.theme||'day';
  if(theme==='night')return{bg:'#181a1e',fg:'#e9edf3',link:'#9bcfff'};
  if(theme==='ebook')return{bg:'#f3ead5',fg:'#382d24',link:'#81552d'};
  return{bg:'#ffffff',fg:'#252525',link:'#1769aa'};
 }
-
 function setTheme(theme){
  if(!['day','night','ebook'].includes(theme))theme='day';
  document.documentElement.dataset.theme=theme;
@@ -464,6 +434,12 @@ function setTheme(theme){
  }
 }
 
+/*
+ * IMPORTANTE PARA EPUB:
+ * no se fuerza el color de todos los elementos del libro.
+ * Así se evita que el CSS del lector oculte letras con colores
+ * propios del EPUB. Solo se aplica el fondo del tema.
+ */
 function applyReaderTheme(){
  const p=themeColors();
  const theme=document.documentElement.dataset.theme||'day';
@@ -471,9 +447,8 @@ function applyReaderTheme(){
  if(state.rendition){
   try{
    state.rendition.themes.default({
-    html:{background:p.bg,color:p.fg},
-    body:{background:p.bg,color:p.fg},
-    'p, div, span, li, h1, h2, h3, h4, h5, h6, blockquote':{color:p.fg},
+    html:{background:p.bg},
+    body:{background:p.bg},
     a:{color:p.link}
    });
 
@@ -481,6 +456,7 @@ function applyReaderTheme(){
    contents.forEach(c=>{
     const doc=c.document;
     if(!doc)return;
+
     let style=doc.getElementById('reader-theme-fix');
     if(!style){
      style=doc.createElement('style');
@@ -491,18 +467,12 @@ function applyReaderTheme(){
     style.textContent=`
      html,body{
        background:${p.bg}!important;
-       color:${p.fg}!important;
        color-scheme:light!important;
      }
-     body{margin:0!important;padding:0!important}
-     body *{color:${p.fg}}
-     a,a *{color:${p.link}!important}
-     img,svg,canvas{background:transparent}
+     body{margin:0!important}
+     a{color:${p.link}}
      ::selection{background:rgba(150,190,230,.4)}
     `;
-
-    doc.documentElement.style.setProperty('background-color',p.bg,'important');
-    if(doc.body)doc.body.style.setProperty('background-color',p.bg,'important');
    });
   }catch(e){console.warn('Tema EPUB:',e)}
  }
@@ -510,20 +480,14 @@ function applyReaderTheme(){
  document.querySelectorAll('.pdf-page').forEach(el=>{
   el.style.backgroundColor=p.bg;
  });
-
  document.querySelectorAll('.pdf-page canvas').forEach(el=>{
-  if(theme==='night'){
-   el.style.filter='invert(.88) hue-rotate(180deg)';
-  }else if(theme==='ebook'){
-   el.style.filter='sepia(.25) saturate(.82) brightness(1.01)';
-  }else{
-   el.style.filter='none';
-  }
+  if(theme==='night')el.style.filter='invert(.88) hue-rotate(180deg)';
+  else if(theme==='ebook')el.style.filter='sepia(.25) saturate(.82) brightness(1.01)';
+  else el.style.filter='none';
  });
-
  document.querySelectorAll('.pdf-paper-tint').forEach(el=>{
   el.style.display=theme==='ebook'?'block':'none';
-  el.style.background=theme==='ebook'?'rgba(243,234,213,.78)':'transparent';
+  el.style.background=theme==='ebook'?'rgba(243,234,213,.65)':'transparent';
   el.style.mixBlendMode=theme==='ebook'?'multiply':'normal';
  });
 }
@@ -531,12 +495,15 @@ function applyReaderTheme(){
 async function closeCurrentDocument(){
  state.loadToken++;
  state.pdfRenderToken++;
+ try{state.pdfRenderTask?.cancel()}catch(_){}
+ state.pdfRenderTask=null;
  try{state.rendition?.destroy()}catch(_){}
  try{state.book?.destroy()}catch(_){}
  try{await state.pdf?.destroy()}catch(_){}
  state.rendition=null;state.book=null;state.pdf=null;
  state.currentBook=null;state.format=null;
  state.locationsReady=false;state.selectedAnchor=null;state.selectedText='';
+ state.epubNavigationBusy=false;
  $('viewer').replaceChildren();
  $('viewer').style.width='100%';
  $('viewer').style.height='100%';
@@ -580,7 +547,6 @@ async function openBook(book){
   status('El documento no se pudo mostrar. Lee el detalle que aparece en el visor.');
  }
 }
-
 function loadScript(url){
  return new Promise((resolve,reject)=>{
   const s=document.createElement('script');
@@ -596,7 +562,6 @@ function loadScript(url){
   document.head.appendChild(s);
  });
 }
-
 async function loadLibraryWithFallback(name,urls){
  if(window[name])return window[name];
  const errors=[];
@@ -609,7 +574,6 @@ async function loadLibraryWithFallback(name,urls){
  }
  throw new Error(`No se pudo cargar ${name}. ${errors.join(' | ')}`);
 }
-
 async function ensureEpubLibraries(){
  await loadLibraryWithFallback('JSZip',[
   'https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js',
@@ -622,12 +586,6 @@ async function ensureEpubLibraries(){
   'https://unpkg.com/epubjs@0.3.93/dist/epub.min.js'
  ]);
 }
-
-/*
- * EPUB: viewport único, spread desactivado y dimensiones tomadas
- * del área real del lector. Se evita fijar el ancho del visor a
- * una medida anterior que pueda producir páginas dobles o recortes.
- */
 function getEpubViewport(){
  const container=$('viewerContainer');
  return{
@@ -635,23 +593,14 @@ function getEpubViewport(){
   height:Math.max(240,Math.floor(container.clientHeight))
  };
 }
-
 function configureEpubViewport(){
  const viewer=$('viewer');
- const container=$('viewerContainer');
  const size=getEpubViewport();
-
  viewer.style.width='100%';
  viewer.style.minWidth='0';
- viewer.style.height=`${size.height}px`;
- viewer.style.minHeight=`${size.height}px`;
+ viewer.style.height=size.height+'px';
+ viewer.style.minHeight=size.height+'px';
  viewer.style.overflow='hidden';
-
- container.style.overflow='hidden';
- container.style.overflowX='hidden';
- container.style.overflowY='hidden';
- container.style.touchAction='pan-y';
-
  return size;
 }
 
@@ -665,7 +614,6 @@ async function loadEpub(url,token){
  }catch(e){
   throw new Error(`No se pudo descargar el EPUB: ${e.message||e}`);
  }
-
  if(!response.ok)throw new Error(`Supabase respondió HTTP ${response.status}.`);
  const bytes=await response.arrayBuffer();
  if(token!==state.loadToken)return;
@@ -675,18 +623,15 @@ async function loadEpub(url,token){
  if(signature[0]!==0x50||signature[1]!==0x4b){
   throw new Error('La URL no devuelve un archivo EPUB ZIP válido.');
  }
-
  try{
   const zip=await window.JSZip.loadAsync(bytes.slice(0));
   if(!zip.file('META-INF/container.xml'))throw new Error('Falta META-INF/container.xml');
  }catch(e){
   throw new Error(`No se puede leer el EPUB: ${e.message||e}`);
  }
-
  if(token!==state.loadToken)return;
 
  const size=configureEpubViewport();
-
  state.book=window.ePub(bytes);
 
  state.rendition=state.book.renderTo('viewer',{
@@ -695,17 +640,15 @@ async function loadEpub(url,token){
   flow:'paginated',
   spread:'none',
   manager:'default',
-  minSpreadWidth:2000,
+  minSpreadWidth:9999,
   allowScriptedContent:false
  });
 
- /* Forzar una sola vista y evitar que el contenido se divida
-    en dos páginas colocadas una junto a otra en el móvil. */
  try{
   state.rendition.spread('none');
   state.rendition.flow('paginated');
  }catch(e){
-  console.warn('No se pudieron aplicar todos los ajustes de paginación EPUB:',e);
+  console.warn('Ajustes de paginación EPUB:',e);
  }
 
  state.rendition.on('displayError',error=>{
@@ -716,7 +659,6 @@ async function loadEpub(url,token){
  state.rendition.on('rendered',()=>{
   applyReaderTheme();
   restoreEpubHighlights();
-  enforceEpubFrameLayout();
  });
 
  state.rendition.on('selected',(cfi,contents)=>{
@@ -738,7 +680,6 @@ async function loadEpub(url,token){
   $('prevPage').disabled=!!loc?.atStart;
   $('nextPage').disabled=!!loc?.atEnd;
   const cfi=loc?.start?.cfi;
-
   if(cfi){
    try{localStorage.setItem(PROGRESS_PREFIX+getBookId(state.currentBook),cfi)}catch(_){}
    if(state.locationsReady){
@@ -750,7 +691,6 @@ async function loadEpub(url,token){
 
  let saved=null;
  try{saved=localStorage.getItem(PROGRESS_PREFIX+getBookId(state.currentBook))}catch(_){}
-
  await state.book.ready;
  if(token!==state.loadToken)return;
 
@@ -760,14 +700,9 @@ async function loadEpub(url,token){
  await state.rendition.display(saved||undefined);
  if(token!==state.loadToken)return;
 
- configureEpubViewport();
- try{
-  const currentSize=getEpubViewport();
-  state.rendition.resize(currentSize.width,currentSize.height);
- }catch(e){console.warn('No se pudo ajustar el tamaño inicial EPUB:',e)}
-
+ const currentSize=getEpubViewport();
+ try{state.rendition.resize(currentSize.width,currentSize.height)}catch(e){console.warn('Resize inicial EPUB:',e)}
  applyReaderTheme();
- enforceEpubFrameLayout();
 
  try{
   await state.book.locations.generate(1000);
@@ -785,134 +720,33 @@ async function loadEpub(url,token){
 }
 
 /*
- * Ajusta el iframe generado por EPUB.js. El tamaño se limita al
- * área visible y las columnas del documento se mantienen dentro
- * de una sola pantalla.
+ * No se modifican las dimensiones de los iframes manualmente:
+ * epub.js las usa para calcular el ancho de cada página.
+ * Forzarlas desde fuera puede romper el cálculo de columnas.
  */
-function enforceEpubFrameLayout(){
- if(!state.rendition)return;
-
- const p=themeColors();
- const size=getEpubViewport();
-
- try{
-  const contents=state.rendition.getContents?.()||[];
-
-  contents.forEach(c=>{
-   const doc=c.document;
-   const frame=c.window?.frameElement;
-   if(!doc)return;
-
-   if(frame){
-    frame.style.setProperty('width',size.width+'px','important');
-    frame.style.setProperty('height',size.height+'px','important');
-    frame.style.setProperty('max-width','100%','important');
-    frame.style.setProperty('border','0','important');
-    frame.style.setProperty('display','block','important');
-   }
-
-   let style=doc.getElementById('reader-epub-layout-fix');
-   if(!style){
-    style=doc.createElement('style');
-    style.id='reader-epub-layout-fix';
-    (doc.head||doc.documentElement).appendChild(style);
-   }
-
-   style.textContent=`
-    html{
-      width:100%!important;
-      max-width:100%!important;
-      height:100%!important;
-      overflow:hidden!important;
-      background:${p.bg}!important;
-      column-count:auto!important;
-    }
-    body{
-      box-sizing:border-box!important;
-      max-width:100%!important;
-      min-height:0!important;
-      margin:0!important;
-      background:${p.bg}!important;
-      color:${p.fg}!important;
-      overflow-wrap:break-word!important;
-      word-wrap:break-word!important;
-    }
-    img,svg,video,canvas{
-      max-width:100%!important;
-      height:auto;
-    }
-    pre,table{
-      max-width:100%!important;
-    }
-    ::selection{background:rgba(150,190,230,.4)}
-   `;
-  });
- }catch(e){
-  console.warn('No se pudo ajustar el contenido interno del EPUB:',e);
- }
-}
-
 function resizeReader(){
- if(state.format==='epub'&&state.rendition){
-  const size=configureEpubViewport();
-
-  try{
-   state.rendition.resize(size.width,size.height);
-  }catch(e){
-   console.warn('Resize EPUB:',e);
-  }
-
-  setTimeout(()=>{
-   if(!state.rendition)return;
-   enforceEpubFrameLayout();
-   applyReaderTheme();
-   restoreEpubHighlights();
-  },100);
- }
+ if(state.format!=='epub'||!state.rendition)return;
+ const rendition=state.rendition;
+ const size=getEpubViewport();
+ try{rendition.resize(size.width,size.height)}catch(e){console.warn('Resize EPUB:',e)}
+ setTimeout(()=>{
+  if(rendition!==state.rendition)return;
+  applyReaderTheme();
+  restoreEpubHighlights();
+ },150);
 }
 
+/* El zoom cambia el tamaño de letra sin llamar display() otra vez. */
 async function setEpubZoom(){
  if(state.format!=='epub'||!state.rendition)return;
-
  const rendition=state.rendition;
- let currentCfi=null;
-
  try{
-  const loc=rendition.currentLocation();
-  currentCfi=loc?.start?.cfi||null;
- }catch(_){}
-
- const percentage=`${Math.round(state.scale*100)}%`;
-
- try{
-  rendition.themes.fontSize(percentage);
- }catch(e){
-  console.warn('No se pudo cambiar el tamaño EPUB:',e);
- }
-
- await new Promise(resolve=>setTimeout(resolve,180));
+  rendition.themes.fontSize(`${Math.round(state.scale*100)}%`);
+ }catch(e){console.warn('No se pudo cambiar el tamaño EPUB:',e)}
+ await new Promise(resolve=>setTimeout(resolve,100));
  if(rendition!==state.rendition)return;
-
- const size=configureEpubViewport();
-
- try{
-  rendition.resize(size.width,size.height);
- }catch(e){
-  console.warn('Resize EPUB:',e);
- }
-
- await new Promise(resolve=>setTimeout(resolve,120));
- if(rendition!==state.rendition)return;
-
- if(currentCfi){
-  try{
-   await rendition.display(currentCfi);
-  }catch(e){
-   console.warn('No se pudo recuperar la posición EPUB:',e);
-  }
- }
-
- enforceEpubFrameLayout();
+ const size=getEpubViewport();
+ try{rendition.resize(size.width,size.height)}catch(e){console.warn('Resize EPUB:',e)}
  applyReaderTheme();
  restoreEpubHighlights();
 }
@@ -920,7 +754,6 @@ async function setEpubZoom(){
 async function loadPdf(url,token){
  if(!window.pdfjsLib)throw new Error('PDF.js no se ha cargado.');
  pdfjsLib.GlobalWorkerOptions.workerSrc='https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.16.105/pdf.worker.min.js';
-
  try{
   state.pdf=await pdfjsLib.getDocument({url,withCredentials:false}).promise;
  }catch(first){
@@ -933,7 +766,6 @@ async function loadPdf(url,token){
   if(sig!=='%PDF-')throw new Error('El archivo descargado no parece un PDF.');
   state.pdf=await pdfjsLib.getDocument({data:new Uint8Array(data)}).promise;
  }
-
  if(token!==state.loadToken)return;
  if(!state.pdf?.numPages)throw new Error('El PDF no contiene páginas legibles.');
 
@@ -943,10 +775,17 @@ async function loadPdf(url,token){
  await renderPdfPage(state.page,token);
 }
 
+/*
+ * PDF: la página nueva se dibuja fuera del visor. La página actual
+ * se conserva hasta que el nuevo canvas esté listo.
+ */
 async function renderPdfPage(num,token=state.loadToken){
  if(!state.pdf)return;
 
  const renderToken=++state.pdfRenderToken;
+ try{state.pdfRenderTask?.cancel()}catch(_){}
+ state.pdfRenderTask=null;
+
  num=Math.max(1,Math.min(state.pdf.numPages,Math.floor(num)));
  state.page=num;
  $('prevPage').disabled=num<=1;
@@ -957,8 +796,6 @@ async function renderPdfPage(num,token=state.loadToken){
  if(token!==state.loadToken||renderToken!==state.pdfRenderToken)return;
 
  const container=$('viewer');
- container.replaceChildren();
-
  const base=page.getViewport({scale:1});
  const available=Math.max(260,$('viewerContainer').clientWidth-24);
  const fitScale=Math.min(1.5,available/base.width);
@@ -992,30 +829,40 @@ async function renderPdfPage(num,token=state.loadToken){
  layer.style.height=`${viewport.height}px`;
 
  wrapper.append(canvas,tint,highlightLayer,layer);
- container.append(wrapper);
 
- container.style.overflow='auto';
- container.style.webkitOverflowScrolling='touch';
-
- await page.render({
-  canvasContext:ctx,viewport,
-  transform:dpr===1?null:[dpr,0,0,dpr,0,0]
- }).promise;
+ let task;
+ try{
+  task=page.render({
+   canvasContext:ctx,viewport,
+   transform:dpr===1?null:[dpr,0,0,dpr,0,0],
+   background:'rgb(255,255,255)'
+  });
+  state.pdfRenderTask=task;
+  await task.promise;
+ }catch(e){
+  if(e?.name==='RenderingCancelledException')return;
+  throw e;
+ }
 
  if(token!==state.loadToken||renderToken!==state.pdfRenderToken)return;
 
  const textContent=await page.getTextContent();
  if(typeof pdfjsLib.renderTextLayer==='function'){
-  const task=pdfjsLib.renderTextLayer({
+  const textTask=pdfjsLib.renderTextLayer({
    textContent,container:layer,viewport,textDivs:[]
   });
-  if(task?.promise)await task.promise;
+  if(textTask?.promise)await textTask.promise;
  }
 
  if(token!==state.loadToken||renderToken!==state.pdfRenderToken)return;
 
- try{localStorage.setItem(PROGRESS_PREFIX+getBookId(state.currentBook),String(num))}catch(_){}
+ /* Solo ahora sustituimos la página visible por la nueva. */
+ container.replaceChildren(wrapper);
+ container.style.overflow='auto';
+ container.style.webkitOverflowScrolling='touch';
+ state.pdfRenderTask=null;
 
+ try{localStorage.setItem(PROGRESS_PREFIX+getBookId(state.currentBook),String(num))}catch(_){}
  applyReaderTheme();
  restorePdfHighlights(num);
 }
@@ -1027,30 +874,23 @@ function safeHighlightColor(color){
  ];
  return allowed.includes(String(color||'').toLowerCase())?String(color).toLowerCase():'#f6df72';
 }
-
 function restorePdfHighlights(pageNumber=state.page){
  if(!state.currentBook||state.format!=='pdf')return;
-
  const wrapper=$('viewer').querySelector('.pdf-page');
  const layer=wrapper?.querySelector('.pdf-highlight-layer');
  if(!wrapper||!layer)return;
-
  layer.replaceChildren();
 
  const id=getBookId(state.currentBook);
  const notes=state.notes.filter(n=>
-  String(n.bookId)===id&&
-  n.type==='Resaltado'&&
-  n.anchor?.kind==='pdf'&&
-  Number(n.anchor.page)===Number(pageNumber)&&
+  String(n.bookId)===id&&n.type==='Resaltado'&&
+  n.anchor?.kind==='pdf'&&Number(n.anchor.page)===Number(pageNumber)&&
   Array.isArray(n.anchor.rects)
  );
-
  notes.forEach(note=>{
   const color=safeHighlightColor(note.color);
   note.anchor.rects.forEach(rect=>{
    if(!rect||![rect.x,rect.y,rect.w,rect.h].every(v=>Number.isFinite(Number(v))))return;
-
    const mark=document.createElement('div');
    mark.className='pdf-highlight-rect';
    mark.style.backgroundColor=color;
@@ -1062,42 +902,30 @@ function restorePdfHighlights(pageNumber=state.page){
   });
  });
 }
-
 function getPdfSelectionAnchor(range,text){
  const wrapper=$('viewer').querySelector('.pdf-page');
  if(!wrapper||!range)return{kind:'pdf',page:state.page,quote:text,rects:[]};
-
  const textLayer=wrapper.querySelector('.textLayer');
  const common=range.commonAncestorContainer;
  if(!textLayer||(common!==textLayer&&!textLayer.contains(common))){
   return{kind:'pdf',page:state.page,quote:text,rects:[]};
  }
-
  const bounds=wrapper.getBoundingClientRect();
  if(!bounds.width||!bounds.height)return{kind:'pdf',page:state.page,quote:text,rects:[]};
 
- const rects=[...range.getClientRects()]
-  .filter(r=>r.width>0&&r.height>0)
-  .map(r=>{
-   const left=Math.max(r.left,bounds.left);
-   const top=Math.max(r.top,bounds.top);
-   const right=Math.min(r.right,bounds.right);
-   const bottom=Math.min(r.bottom,bounds.bottom);
-
-   if(right<=left||bottom<=top)return null;
-
-   return{
-    x:(left-bounds.left)/bounds.width,
-    y:(top-bounds.top)/bounds.height,
-    w:(right-left)/bounds.width,
-    h:(bottom-top)/bounds.height
-   };
-  })
-  .filter(Boolean);
-
+ const rects=[...range.getClientRects()].filter(r=>r.width>0&&r.height>0).map(r=>{
+  const left=Math.max(r.left,bounds.left);
+  const top=Math.max(r.top,bounds.top);
+  const right=Math.min(r.right,bounds.right);
+  const bottom=Math.min(r.bottom,bounds.bottom);
+  if(right<=left||bottom<=top)return null;
+  return{
+   x:(left-bounds.left)/bounds.width,y:(top-bounds.top)/bounds.height,
+   w:(right-left)/bounds.width,h:(bottom-top)/bounds.height
+  };
+ }).filter(Boolean);
  return{kind:'pdf',page:state.page,quote:text,rects};
 }
-
 function clampMenuPosition(x,y){
  const menu=$('selectionMenu');
  const w=menu.offsetWidth||280;
@@ -1107,70 +935,46 @@ function clampMenuPosition(x,y){
   y:Math.max(6,Math.min(Math.max(6,window.innerHeight-h-6),y))
  };
 }
-
 function showSelectionMenu(x,y){
  const menu=$('selectionMenu');
  menu.style.display='flex';
-
  requestAnimationFrame(()=>{
   let saved=null;
   try{saved=JSON.parse(localStorage.getItem(MENU_POSITION_KEY)||'null')}catch(_){}
-
-  if(saved&&Number.isFinite(saved.x)&&Number.isFinite(saved.y)){
-   const pos=clampMenuPosition(saved.x,saved.y);
-   menu.style.left=`${pos.x}px`;
-   menu.style.top=`${pos.y}px`;
-  }else{
-   const pos=clampMenuPosition(x,y);
-   menu.style.left=`${pos.x}px`;
-   menu.style.top=`${pos.y}px`;
-  }
+  const pos=saved&&Number.isFinite(saved.x)&&Number.isFinite(saved.y)
+   ?clampMenuPosition(saved.x,saved.y):clampMenuPosition(x,y);
+  menu.style.left=`${pos.x}px`;
+  menu.style.top=`${pos.y}px`;
  });
 }
-
-function hideSelectionMenu(){
- $('selectionMenu').style.display='none';
-}
+function hideSelectionMenu(){$('selectionMenu').style.display='none'}
 
 function capturePdfSelection(){
  if(state.format!=='pdf')return;
-
  const sel=window.getSelection();
  const text=sel?.toString()?.trim();
  if(!text||!sel.rangeCount)return;
-
  const range=sel.getRangeAt(0);
  const node=range.commonAncestorContainer;
  const textLayer=$('viewer').querySelector('.textLayer');
-
  if(!textLayer||!(node===textLayer||textLayer.contains(node)))return;
-
  const anchor=getPdfSelectionAnchor(range,text);
  if(!anchor.rects.length)return;
-
  state.selectedText=text;
  state.selectedAnchor=anchor;
-
  const rect=range.getBoundingClientRect();
- let x=rect.left;
- let y=rect.bottom+8;
-
- if(!Number.isFinite(x)||!Number.isFinite(y)){x=10;y=80}
- showSelectionMenu(x,y);
+ showSelectionMenu(Number.isFinite(rect.left)?rect.left:10,Number.isFinite(rect.bottom)?rect.bottom+8:80);
 }
-
 document.addEventListener('selectionchange',()=>{
  if(state.format!=='pdf')return;
  clearTimeout(state.selectionTimer);
  state.selectionTimer=setTimeout(capturePdfSelection,100);
 });
-
 $('viewerContainer').addEventListener('touchend',()=>{
  if(state.format!=='pdf')return;
  clearTimeout(state.selectionTimer);
  state.selectionTimer=setTimeout(capturePdfSelection,180);
 },{passive:true});
-
 $('viewerContainer').addEventListener('pointerup',()=>{
  if(state.format!=='pdf')return;
  clearTimeout(state.selectionTimer);
@@ -1180,30 +984,19 @@ $('viewerContainer').addEventListener('pointerup',()=>{
 (function enableMenuDragging(){
  const handle=$('menuDragHandle');
  const menu=$('selectionMenu');
- if(!handle||!menu)return;
-
  let dragging=false,startX=0,startY=0,originX=0,originY=0;
-
  handle.addEventListener('pointerdown',e=>{
-  e.preventDefault();
-  dragging=true;
+  e.preventDefault();dragging=true;
   const rect=menu.getBoundingClientRect();
-  startX=e.clientX;
-  startY=e.clientY;
-  originX=rect.left;
-  originY=rect.top;
+  startX=e.clientX;startY=e.clientY;originX=rect.left;originY=rect.top;
   try{handle.setPointerCapture(e.pointerId)}catch(_){}
  });
-
  handle.addEventListener('pointermove',e=>{
   if(!dragging)return;
   e.preventDefault();
   const pos=clampMenuPosition(originX+e.clientX-startX,originY+e.clientY-startY);
-  menu.style.left=`${pos.x}px`;
-  menu.style.top=`${pos.y}px`;
-  menu.style.right='auto';
+  menu.style.left=`${pos.x}px`;menu.style.top=`${pos.y}px`;menu.style.right='auto';
  });
-
  function endDrag(){
   if(!dragging)return;
   dragging=false;
@@ -1211,15 +1004,14 @@ $('viewerContainer').addEventListener('pointerup',()=>{
   const pos=clampMenuPosition(rect.left,rect.top);
   try{localStorage.setItem(MENU_POSITION_KEY,JSON.stringify(pos))}catch(_){}
  }
-
  handle.addEventListener('pointerup',endDrag);
  handle.addEventListener('pointercancel',endDrag);
 })();
 
+/* Aplicar un resaltado EPUB sin imponer estilos globales al texto. */
 function applyEpubHighlight(cfi,color){
  if(!state.rendition||!cfi)return false;
  const safe=safeHighlightColor(color);
-
  try{
   state.rendition.annotations.highlight(
    cfi,
@@ -1228,8 +1020,7 @@ function applyEpubHighlight(cfi,color){
    'reader-highlight',
    {
     fill:safe,
-    'fill-opacity':'0.30',
-    'mix-blend-mode':'multiply',
+    'fill-opacity':'0.35',
     'pointer-events':'none',
     'stroke':'none'
    }
@@ -1240,79 +1031,53 @@ function applyEpubHighlight(cfi,color){
   return false;
  }
 }
-
 function restoreEpubHighlights(){
  if(!state.rendition||!state.currentBook)return;
  const id=getBookId(state.currentBook);
- state.notes
-  .filter(n=>String(n.bookId)===id&&n.type==='Resaltado'&&n.anchor?.kind==='epub'&&n.anchor.cfi)
-  .forEach(n=>applyEpubHighlight(n.anchor.cfi,n.color||'#f6df72'));
+ state.notes.filter(n=>
+  String(n.bookId)===id&&n.type==='Resaltado'&&
+  n.anchor?.kind==='epub'&&n.anchor.cfi
+ ).forEach(n=>applyEpubHighlight(n.anchor.cfi,n.color||'#f6df72'));
 }
-
 function createNote({type,text,original='',anchor=state.selectedAnchor,color=null}){
  state.notes.unshift({
-  id:makeId(),
-  bookId:getBookId(state.currentBook),
+  id:makeId(),bookId:getBookId(state.currentBook),
   bookTitle:state.currentBook?.titulo||'Libro',
   type,text,original,anchor,color,
   createdAt:new Date().toISOString()
  });
- saveNotes();
- hideSelectionMenu();
- renderNotes();
+ saveNotes();hideSelectionMenu();renderNotes();
 }
 
 $('highlightSelection').addEventListener('click',()=>{
  if(!state.selectedText||!state.currentBook){
-  alert('Selecciona primero una palabra o un fragmento del libro.');
-  return;
+  alert('Selecciona primero una palabra o un fragmento del libro.');return;
  }
-
  const anchor=state.selectedAnchor?JSON.parse(JSON.stringify(state.selectedAnchor)):{kind:state.format};
  const color=safeHighlightColor($('highlightColor').value);
-
  if(state.format==='epub'){
-  if(!anchor.cfi){
-   alert('No se pudo identificar el fragmento. Selecciona el texto de nuevo.');
-   return;
-  }
+  if(!anchor.cfi){alert('No se pudo identificar el fragmento. Selecciona el texto de nuevo.');return}
   if(!applyEpubHighlight(anchor.cfi,color)){
-   alert('No se pudo resaltar el texto. Prueba a seleccionar otra vez.');
-   return;
+   alert('No se pudo resaltar el texto. Prueba a seleccionar otra vez.');return;
   }
  }else if(state.format==='pdf'){
   if(!Array.isArray(anchor.rects)||anchor.rects.length===0){
-   alert('No se pudieron obtener las coordenadas del texto. Selecciónalo de nuevo e inténtalo otra vez.');
-   return;
+   alert('No se pudieron obtener las coordenadas del texto. Selecciónalo de nuevo e inténtalo otra vez.');return;
   }
  }
-
  createNote({type:'Resaltado',text:state.selectedText,anchor,color});
-
  if(state.format==='pdf')restorePdfHighlights(state.page);
-
- try{
-  (state.rendition?.getContents?.()||[]).forEach(c=>c.window?.getSelection?.().removeAllRanges());
- }catch(_){}
+ try{(state.rendition?.getContents?.()||[]).forEach(c=>c.window?.getSelection?.().removeAllRanges())}catch(_){}
  try{window.getSelection()?.removeAllRanges()}catch(_){}
-
- state.selectedText='';
- state.selectedAnchor=null;
+ state.selectedText='';state.selectedAnchor=null;
 });
 
 $('noteSelection').addEventListener('click',()=>{
- if(!state.selectedText||!state.currentBook){
-  alert('Selecciona primero un fragmento de texto.');
-  return;
- }
+ if(!state.selectedText||!state.currentBook){alert('Selecciona primero un fragmento de texto.');return}
  const selected=state.selectedText;
  const anchor=state.selectedAnchor?JSON.parse(JSON.stringify(state.selectedAnchor)):null;
-
- openDialog('Nota',selected,'',value=>{
-  createNote({type:'Nota',text:value,original:selected,anchor});
- });
+ openDialog('Nota',selected,'',value=>createNote({type:'Nota',text:value,original:selected,anchor}));
 });
-
 function openDialog(title,original,value,onSave){
  state.pendingAction=onSave;
  $('dialogTitle').textContent=title;
@@ -1321,24 +1086,18 @@ function openDialog(title,original,value,onSave){
  $('dialogBackdrop').style.display='flex';
  $('dialogText').focus();
 }
-
 function closeDialog(){
- $('dialogBackdrop').style.display='none';
- state.pendingAction=null;
+ $('dialogBackdrop').style.display='none';state.pendingAction=null;
 }
-
 $('dialogCancel').addEventListener('click',closeDialog);
 $('dialogBackdrop').addEventListener('click',e=>{
  if(e.target===$('dialogBackdrop'))closeDialog();
 });
-
 $('dialogSave').addEventListener('click',()=>{
  const cb=state.pendingAction,value=$('dialogText').value.trim();
  if(!value){$('dialogText').focus();return}
- closeDialog();
- if(cb)cb(value);
+ closeDialog();if(cb)cb(value);
 });
-
 $('closeSelection').addEventListener('click',hideSelectionMenu);
 
 document.addEventListener('pointerdown',e=>{
@@ -1348,51 +1107,56 @@ document.addEventListener('pointerdown',e=>{
  hideSelectionMenu();
 });
 
+/* Evitar órdenes de navegación EPUB superpuestas. */
+async function navigateEpub(direction){
+ if(!state.rendition||state.epubNavigationBusy)return;
+ const rendition=state.rendition;
+ state.epubNavigationBusy=true;
+ $('prevPage').disabled=true;
+ $('nextPage').disabled=true;
+ try{
+  if(direction==='next')await rendition.next();
+  else await rendition.prev();
+ }catch(e){
+  status(`No se pudo cambiar de página: ${e.message||e}`);
+ }finally{
+  state.epubNavigationBusy=false;
+  if(rendition===state.rendition){
+   const loc=rendition.currentLocation();
+   $('prevPage').disabled=!!loc?.atStart;
+   $('nextPage').disabled=!!loc?.atEnd;
+  }
+ }
+}
 $('prevPage').addEventListener('click',async()=>{
  hideSelectionMenu();
- try{
-  if(state.format==='epub'&&state.rendition)await state.rendition.prev();
-  else if(state.format==='pdf'&&state.pdf&&state.page>1)await renderPdfPage(state.page-1);
- }catch(e){status(`No se pudo ir a la página anterior: ${e.message||e}`)}
+ if(state.format==='epub')await navigateEpub('prev');
+ else if(state.format==='pdf'&&state.pdf&&state.page>1)await renderPdfPage(state.page-1);
 });
-
 $('nextPage').addEventListener('click',async()=>{
  hideSelectionMenu();
- try{
-  if(state.format==='epub'&&state.rendition)await state.rendition.next();
-  else if(state.format==='pdf'&&state.pdf&&state.page<state.pdf.numPages)await renderPdfPage(state.page+1);
- }catch(e){status(`No se pudo avanzar: ${e.message||e}`)}
+ if(state.format==='epub')await navigateEpub('next');
+ else if(state.format==='pdf'&&state.pdf&&state.page<state.pdf.numPages)await renderPdfPage(state.page+1);
 });
 
 async function changeZoom(direction){
  const next=state.scale+direction;
  state.scale=Math.max(.6,Math.min(3,Math.round(next*10)/10));
  $('zoomLabel').textContent=`${Math.round(state.scale*100)}%`;
-
  if(state.format==='pdf'&&state.pdf){
-  const container=$('viewerContainer');
-  const oldLeft=container.scrollLeft;
-  const oldTop=container.scrollTop;
   await renderPdfPage(state.page);
-  container.scrollLeft=oldLeft;
-  container.scrollTop=oldTop;
  }else if(state.format==='epub'&&state.rendition){
   await setEpubZoom();
  }
 }
-
 $('zoomIn').addEventListener('click',()=>changeZoom(.2));
 $('zoomOut').addEventListener('click',()=>changeZoom(-.2));
-
 $('themeSelect').addEventListener('change',e=>setTheme(e.target.value));
 $('navLibrary').addEventListener('click',()=>setSection('librarySection'));
 $('navNotes').addEventListener('click',()=>setSection('notesSection'));
-
 $('backLibrary').addEventListener('click',async()=>{
- await closeCurrentDocument();
- setSection('librarySection');
+ await closeCurrentDocument();setSection('librarySection');
 });
-
 $('reloadBooks').addEventListener('click',loadBooks);
 $('searchBooks').addEventListener('input',renderBooks);
 $('searchNotes').addEventListener('input',renderNotes);
@@ -1403,57 +1167,43 @@ function renderNotes(){
  const items=state.notes.filter(n=>
   [n.bookTitle,n.type,n.text,n.original].join(' ').toLocaleLowerCase().includes(q)
  );
-
  if(!items.length){
   const p=document.createElement('p');p.className='empty';
-  p.textContent='Todavía no hay anotaciones.';
-  list.append(p);return;
+  p.textContent='Todavía no hay anotaciones.';list.append(p);return;
  }
-
  items.forEach(n=>{
-  const article=document.createElement('article');
-  article.className='note';
-
+  const article=document.createElement('article');article.className='note';
   const head=document.createElement('div');head.className='note-head';
   const label=document.createElement('strong');
   label.textContent=`${n.type} · ${n.bookTitle||'Libro'}`;
-
   const del=document.createElement('button');
   del.className='danger';del.textContent='Eliminar';
   del.addEventListener('click',()=>{
    if(!confirm('¿Eliminar esta anotación?'))return;
    state.notes=state.notes.filter(x=>x.id!==n.id);
-   saveNotes();
-   renderNotes();
+   saveNotes();renderNotes();
    if(state.format==='pdf'&&state.pdf)restorePdfHighlights(state.page);
    if(state.format==='epub'&&state.rendition){
     try{
-     state.rendition.annotations.remove(n.anchor?.cfi,'highlight');
+     if(n.anchor?.cfi)state.rendition.annotations.remove(n.anchor.cfi,'highlight');
      restoreEpubHighlights();
     }catch(_){}
    }
   });
-
   head.append(label,del);
   const date=document.createElement('div');
   date.className='muted small';
   date.textContent=new Date(n.createdAt).toLocaleString();
   article.append(head,date);
-
   if(n.original){
    const orig=document.createElement('p');
-   orig.textContent=`Texto original: ${n.original}`;
-   article.append(orig);
+   orig.textContent=`Texto original: ${n.original}`;article.append(orig);
   }
-
-  const text=document.createElement('p');
-  text.textContent=n.text;
+  const text=document.createElement('p');text.textContent=n.text;
   if(n.color)text.style.borderLeft=`5px solid ${n.color}`;
-  article.append(text);
-  list.append(article);
+  article.append(text);list.append(article);
  });
 }
-
 $('exportNotes').addEventListener('click',()=>{
  const blob=new Blob([JSON.stringify(state.notes,null,2)],{type:'application/json'});
  const url=URL.createObjectURL(blob);
@@ -1463,50 +1213,23 @@ $('exportNotes').addEventListener('click',()=>{
  setTimeout(()=>URL.revokeObjectURL(url),1000);
 });
 
+/* Redimensionado único y retrasado: evita repetir display() en cadena. */
 window.addEventListener('resize',()=>{
  if(state.format==='epub'){
-  clearTimeout(window.__readerResizeTimer);
-  window.__readerResizeTimer=setTimeout(async()=>{
-   const rendition=state.rendition;
-   let cfi=null;
-   try{cfi=rendition?.currentLocation()?.start?.cfi||null}catch(_){}
-
-   if(!rendition)return;
-
-   const size=configureEpubViewport();
-
-   try{
-    rendition.resize(size.width,size.height);
-   }catch(e){
-    console.warn('No se pudo redimensionar EPUB:',e);
-   }
-
-   setTimeout(async()=>{
-    if(rendition!==state.rendition)return;
-
-    if(cfi){
-     try{await rendition.display(cfi)}catch(_){}
-    }
-
-    enforceEpubFrameLayout();
-    applyReaderTheme();
-    restoreEpubHighlights();
-   },150);
-  },180);
+  clearTimeout(state.epubResizeTimer);
+  state.epubResizeTimer=setTimeout(()=>resizeReader(),250);
  }
-
  if(state.format==='pdf'&&state.pdf){
   clearTimeout(window.__pdfResizeTimer);
-  window.__pdfResizeTimer=setTimeout(()=>renderPdfPage(state.page),200);
+  window.__pdfResizeTimer=setTimeout(()=>renderPdfPage(state.page),250);
  }
 });
-
 window.addEventListener('beforeunload',()=>{
+ try{state.pdfRenderTask?.cancel()}catch(_){}
  try{state.rendition?.destroy();state.book?.destroy();state.pdf?.destroy()}catch(_){}
 });
 
 loadNotes();
-
 try{setTheme(localStorage.getItem(THEME_KEY)||'day')}
 catch(_){setTheme('day')}
 
@@ -1515,7 +1238,6 @@ try{
   state.supabase=window.supabase.createClient(CONFIG.supabaseUrl,CONFIG.supabaseAnonKey);
  }
 }catch(e){console.error('Supabase:',e)}
-
 loadBooks();
 })();
 </script>
