@@ -5,7 +5,6 @@
 <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
 <meta name="color-scheme" content="light dark">
 <title>Lector Pro · Telegram</title>
-
 <script src="https://telegram.org/js/telegram-web-app.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.16.105/pdf.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
@@ -132,15 +131,18 @@ main{flex:1;min-height:0;position:relative}
  mix-blend-mode:multiply
 }
 .textLayer{
- position:absolute;inset:0;z-index:3;overflow:hidden;
- line-height:1;user-select:text;-webkit-user-select:text;
- pointer-events:auto
+ position:absolute;left:0;top:0;right:0;bottom:0;
+ z-index:3;overflow:hidden;line-height:1;
+ text-align:initial;user-select:text;-webkit-user-select:text;
+ -webkit-touch-callout:default;pointer-events:auto;
+ transform-origin:0 0
 }
 .textLayer span{
  position:absolute;white-space:pre;color:transparent;
- transform-origin:0 0;cursor:text
+ transform-origin:0 0;cursor:text;
+ user-select:text;-webkit-user-select:text
 }
-.textLayer ::selection{background:rgba(255,210,80,.4)}
+.textLayer ::selection{background:rgba(255,210,80,.45)}
 .reader-bottom{
  display:flex;justify-content:space-between;align-items:center;
  gap:8px;padding:8px 10px;background:var(--card);
@@ -154,18 +156,23 @@ main{flex:1;min-height:0;position:relative}
  display:none;position:fixed;z-index:99;gap:5px;padding:7px;
  background:#242932;color:white;border-radius:11px;
  box-shadow:0 6px 24px #0004;max-width:calc(100vw - 12px);
- max-height:40dvh;overflow:auto;flex-wrap:wrap;touch-action:pan-y
+ max-height:45dvh;overflow:auto;flex-wrap:wrap;
+ touch-action:pan-y;overscroll-behavior:contain
 }
 #selectionMenu button{
  font-size:12px;padding:8px;background:#3a414d;
  color:white;white-space:nowrap
 }
 #selectionMenu select{
- font-size:12px;max-width:95px;padding:7px;
+ font-size:12px;max-width:110px;padding:7px;
  border:1px solid #626b78;border-radius:7px;
  background:#303640;color:white
 }
 #highlightSelection{background:#e8d98a!important;color:#302a17!important}
+#menuDragHandle{
+ background:#515b69!important;touch-action:none;
+ cursor:move;min-width:34px;font-size:16px!important
+}
 .note{
  padding:12px;margin-bottom:10px;background:var(--card);
  border:1px solid var(--line);border-radius:10px;overflow-wrap:anywhere
@@ -253,7 +260,8 @@ main{flex:1;min-height:0;position:relative}
 </main>
 </div>
 
-<div id="selectionMenu">
+<div id="selectionMenu" aria-label="Acciones del texto seleccionado">
+ <button id="menuDragHandle" type="button" aria-label="Mover menú" title="Mantén pulsado para mover">⠿</button>
  <select id="highlightColor" aria-label="Color del resaltado">
   <option value="#f6df72">Amarillo suave</option>
   <option value="#b9e8c5">Verde suave</option>
@@ -280,7 +288,7 @@ main{flex:1;min-height:0;position:relative}
 </div>
 
 <script>
-(() => {
+(()=>{
 'use strict';
 
 const tg=window.Telegram?.WebApp;
@@ -295,13 +303,14 @@ const $=id=>document.getElementById(id);
 const NOTES_KEY='reader_pro_notes_v1';
 const THEME_KEY='reader_pro_theme';
 const PROGRESS_PREFIX='reader_pro_progress_';
+const MENU_POSITION_KEY='reader_pro_selection_menu_position_v1';
 
 const state={
  supabase:null,books:[],currentBook:null,format:null,
  book:null,rendition:null,pdf:null,page:1,scale:1,
  selectedText:'',selectedAnchor:null,notes:[],
  loadToken:0,pendingAction:null,locationsReady:false,
- pdfRenderToken:0
+ pdfRenderToken:0,selectionTimer:null
 };
 
 function status(message,show=true){
@@ -341,8 +350,11 @@ function loadNotes(){
 }
 
 function saveNotes(){
- try{localStorage.setItem(NOTES_KEY,JSON.stringify(state.notes))}
- catch(_){status('No se pudieron guardar las notas en este dispositivo.')}
+ try{
+  localStorage.setItem(NOTES_KEY,JSON.stringify(state.notes));
+ }catch(_){
+  status('No se pudieron guardar las notas en este dispositivo. Comprueba el espacio disponible.');
+ }
 }
 
 function setSection(id){
@@ -470,7 +482,6 @@ function applyReaderTheme(){
   if(theme==='night'){
    el.style.filter='invert(.88) hue-rotate(180deg)';
   }else if(theme==='ebook'){
-   // Tinte moderado en el lienzo; la capa crema de encima hace el fondo más cálido.
    el.style.filter='sepia(.25) saturate(.82) brightness(1.01)';
   }else{
    el.style.filter='none';
@@ -706,15 +717,10 @@ async function setEpubZoom(){
  }catch(_){}
 
  const percentage=`${Math.round(state.scale*100)}%`;
- try{
-  rendition.themes.fontSize(percentage);
- }catch(e){
-  console.warn('No se pudo cambiar el tamaño EPUB:',e);
- }
+ try{rendition.themes.fontSize(percentage)}
+ catch(e){console.warn('No se pudo cambiar el tamaño EPUB:',e)}
 
- // Esperar a que el contenido reajuste su maquetación antes de recuperar la posición.
  await new Promise(resolve=>setTimeout(resolve,180));
-
  if(rendition!==state.rendition)return;
 
  const w=Math.max(280,$('viewerContainer').clientWidth);
@@ -723,13 +729,12 @@ async function setEpubZoom(){
  $('viewer').style.height=`${h}px`;
 
  try{rendition.resize(w,h)}catch(e){console.warn('Resize EPUB:',e)}
-
  await new Promise(resolve=>setTimeout(resolve,120));
-
  if(rendition!==state.rendition)return;
 
  if(currentCfi){
-  try{await rendition.display(currentCfi)}catch(e){console.warn('No se pudo recuperar la posición EPUB:',e)}
+  try{await rendition.display(currentCfi)}
+  catch(e){console.warn('No se pudo recuperar la posición EPUB:',e)}
  }
 
  applyReaderTheme();
@@ -797,11 +802,9 @@ async function renderPdfPage(num,token=state.loadToken){
  canvas.style.width=`${viewport.width}px`;
  canvas.style.height=`${viewport.height}px`;
 
- // Capa de color para que el fondo blanco del propio PDF se vea crema.
  const tint=document.createElement('div');
  tint.className='pdf-paper-tint';
 
- // Las marcas se dibujan encima del lienzo y debajo de la capa de selección.
  const highlightLayer=document.createElement('div');
  highlightLayer.className='pdf-highlight-layer';
  highlightLayer.style.width=`${viewport.width}px`;
@@ -842,7 +845,11 @@ async function renderPdfPage(num,token=state.loadToken){
 }
 
 function safeHighlightColor(color){
- return /^#[0-9a-f]{6}$/i.test(String(color||''))?color:'#f6df72';
+ const allowed=[
+  '#f6df72','#b9e8c5','#b9dcf8',
+  '#f4c4d8','#f5d0a6','#d8c8f4'
+ ];
+ return allowed.includes(String(color||'').toLowerCase())?String(color).toLowerCase():'#f6df72';
 }
 
 function restorePdfHighlights(pageNumber=state.page){
@@ -856,7 +863,7 @@ function restorePdfHighlights(pageNumber=state.page){
 
  const id=getBookId(state.currentBook);
  const notes=state.notes.filter(n=>
-  n.bookId===id&&
+  String(n.bookId)===id&&
   n.type==='Resaltado'&&
   n.anchor?.kind==='pdf'&&
   Number(n.anchor.page)===Number(pageNumber)&&
@@ -866,15 +873,15 @@ function restorePdfHighlights(pageNumber=state.page){
  notes.forEach(note=>{
   const color=safeHighlightColor(note.color);
   note.anchor.rects.forEach(rect=>{
-   if(!rect||![rect.x,rect.y,rect.w,rect.h].every(Number.isFinite))return;
+   if(!rect||![rect.x,rect.y,rect.w,rect.h].every(v=>Number.isFinite(Number(v))))return;
 
    const mark=document.createElement('div');
    mark.className='pdf-highlight-rect';
    mark.style.backgroundColor=color;
-   mark.style.left=`${rect.x*100}%`;
-   mark.style.top=`${rect.y*100}%`;
-   mark.style.width=`${Math.max(0,rect.w*100)}%`;
-   mark.style.height=`${Math.max(0,rect.h*100)}%`;
+   mark.style.left=`${Number(rect.x)*100}%`;
+   mark.style.top=`${Number(rect.y)*100}%`;
+   mark.style.width=`${Math.max(0,Number(rect.w)*100)}%`;
+   mark.style.height=`${Math.max(0,Number(rect.h)*100)}%`;
    layer.append(mark);
   });
  });
@@ -883,6 +890,12 @@ function restorePdfHighlights(pageNumber=state.page){
 function getPdfSelectionAnchor(range,text){
  const wrapper=$('viewer').querySelector('.pdf-page');
  if(!wrapper||!range)return{kind:'pdf',page:state.page,quote:text,rects:[]};
+
+ const textLayer=wrapper.querySelector('.textLayer');
+ const common=range.commonAncestorContainer;
+ if(!textLayer||(common!==textLayer&&!textLayer.contains(common))){
+  return{kind:'pdf',page:state.page,quote:text,rects:[]};
+ }
 
  const bounds=wrapper.getBoundingClientRect();
  if(!bounds.width||!bounds.height)return{kind:'pdf',page:state.page,quote:text,rects:[]};
@@ -909,13 +922,33 @@ function getPdfSelectionAnchor(range,text){
  return{kind:'pdf',page:state.page,quote:text,rects};
 }
 
+function clampMenuPosition(x,y){
+ const menu=$('selectionMenu');
+ const w=menu.offsetWidth||280;
+ const h=menu.offsetHeight||60;
+ return{
+  x:Math.max(6,Math.min(Math.max(6,window.innerWidth-w-6),x)),
+  y:Math.max(6,Math.min(Math.max(6,window.innerHeight-h-6),y))
+ };
+}
+
 function showSelectionMenu(x,y){
  const menu=$('selectionMenu');
  menu.style.display='flex';
+
  requestAnimationFrame(()=>{
-  const w=menu.offsetWidth||280,h=menu.offsetHeight||50;
-  menu.style.left=`${Math.max(6,Math.min(window.innerWidth-w-6,x))}px`;
-  menu.style.top=`${Math.max(6,Math.min(window.innerHeight-h-6,y))}px`;
+  let saved=null;
+  try{saved=JSON.parse(localStorage.getItem(MENU_POSITION_KEY)||'null')}catch(_){}
+
+  if(saved&&Number.isFinite(saved.x)&&Number.isFinite(saved.y)){
+   const pos=clampMenuPosition(saved.x,saved.y);
+   menu.style.left=`${pos.x}px`;
+   menu.style.top=`${pos.y}px`;
+  }else{
+   const pos=clampMenuPosition(x,y);
+   menu.style.left=`${pos.x}px`;
+   menu.style.top=`${pos.y}px`;
+  }
  });
 }
 
@@ -923,23 +956,89 @@ function hideSelectionMenu(){
  $('selectionMenu').style.display='none';
 }
 
-document.addEventListener('selectionchange',()=>{
+function capturePdfSelection(){
  if(state.format!=='pdf')return;
 
  const sel=window.getSelection();
  const text=sel?.toString()?.trim();
- if(!text)return;
-
- const node=sel.anchorNode;
- if(!node||!$('viewer').contains(node))return;
+ if(!text||!sel.rangeCount)return;
 
  const range=sel.getRangeAt(0);
+ const node=range.commonAncestorContainer;
+ const textLayer=$('viewer').querySelector('.textLayer');
+
+ if(!textLayer||!(node===textLayer||textLayer.contains(node)))return;
+
+ const anchor=getPdfSelectionAnchor(range,text);
+ if(!anchor.rects.length)return;
+
  state.selectedText=text;
- state.selectedAnchor=getPdfSelectionAnchor(range,text);
+ state.selectedAnchor=anchor;
 
  const rect=range.getBoundingClientRect();
- showSelectionMenu(rect.left,rect.bottom+8);
+ let x=rect.left;
+ let y=rect.bottom+8;
+
+ if(!Number.isFinite(x)||!Number.isFinite(y)){x=10;y=80}
+ showSelectionMenu(x,y);
+}
+
+document.addEventListener('selectionchange',()=>{
+ if(state.format!=='pdf')return;
+ clearTimeout(state.selectionTimer);
+ state.selectionTimer=setTimeout(capturePdfSelection,100);
 });
+
+$('viewerContainer').addEventListener('touchend',()=>{
+ if(state.format!=='pdf')return;
+ clearTimeout(state.selectionTimer);
+ state.selectionTimer=setTimeout(capturePdfSelection,180);
+},{passive:true});
+
+$('viewerContainer').addEventListener('pointerup',()=>{
+ if(state.format!=='pdf')return;
+ clearTimeout(state.selectionTimer);
+ state.selectionTimer=setTimeout(capturePdfSelection,100);
+});
+
+(function enableMenuDragging(){
+ const handle=$('menuDragHandle');
+ const menu=$('selectionMenu');
+ if(!handle||!menu)return;
+
+ let dragging=false,startX=0,startY=0,originX=0,originY=0;
+
+ handle.addEventListener('pointerdown',e=>{
+  e.preventDefault();
+  dragging=true;
+  const rect=menu.getBoundingClientRect();
+  startX=e.clientX;
+  startY=e.clientY;
+  originX=rect.left;
+  originY=rect.top;
+  try{handle.setPointerCapture(e.pointerId)}catch(_){}
+ });
+
+ handle.addEventListener('pointermove',e=>{
+  if(!dragging)return;
+  e.preventDefault();
+  const pos=clampMenuPosition(originX+e.clientX-startX,originY+e.clientY-startY);
+  menu.style.left=`${pos.x}px`;
+  menu.style.top=`${pos.y}px`;
+  menu.style.right='auto';
+ });
+
+ function endDrag(){
+  if(!dragging)return;
+  dragging=false;
+  const rect=menu.getBoundingClientRect();
+  const pos=clampMenuPosition(rect.left,rect.top);
+  try{localStorage.setItem(MENU_POSITION_KEY,JSON.stringify(pos))}catch(_){}
+ }
+
+ handle.addEventListener('pointerup',endDrag);
+ handle.addEventListener('pointercancel',endDrag);
+})();
 
 function applyEpubHighlight(cfi,color){
  if(!state.rendition||!cfi)return false;
@@ -970,7 +1069,7 @@ function restoreEpubHighlights(){
  if(!state.rendition||!state.currentBook)return;
  const id=getBookId(state.currentBook);
  state.notes
-  .filter(n=>n.bookId===id&&n.type==='Resaltado'&&n.anchor?.kind==='epub'&&n.anchor.cfi)
+  .filter(n=>String(n.bookId)===id&&n.type==='Resaltado'&&n.anchor?.kind==='epub'&&n.anchor.cfi)
   .forEach(n=>applyEpubHighlight(n.anchor.cfi,n.color||'#f6df72'));
 }
 
@@ -993,7 +1092,7 @@ $('highlightSelection').addEventListener('click',()=>{
   return;
  }
 
- const anchor=state.selectedAnchor?{...state.selectedAnchor}: {kind:state.format};
+ const anchor=state.selectedAnchor?JSON.parse(JSON.stringify(state.selectedAnchor)):{kind:state.format};
  const color=safeHighlightColor($('highlightColor').value);
 
  if(state.format==='epub'){
@@ -1067,11 +1166,10 @@ $('dialogSave').addEventListener('click',()=>{
 $('closeSelection').addEventListener('click',hideSelectionMenu);
 
 document.addEventListener('pointerdown',e=>{
- if(!$('selectionMenu').contains(e.target)&&
-    !window.getSelection()?.toString()?.trim()&&
-    !state.selectedText){
-  hideSelectionMenu();
- }
+ if($('selectionMenu').contains(e.target))return;
+ if(e.target.closest('.textLayer'))return;
+ if(e.target.closest('#viewerContainer'))return;
+ hideSelectionMenu();
 });
 
 $('prevPage').addEventListener('click',async()=>{
