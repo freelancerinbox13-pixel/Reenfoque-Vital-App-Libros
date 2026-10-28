@@ -211,29 +211,23 @@ function applyEpubTheme() {
         }
         style.textContent=`
           *, *::before, *::after { box-sizing: border-box !important; }
+          /* No anular la altura ni las columnas que calcula epub.js: eso hacía
+             que la página del libro fuese más ancha/alta que el visor móvil. */
           html, body {
-            display: block !important;
             width: 100% !important;
             max-width: 100% !important;
             min-width: 0 !important;
-            height: auto !important;
-            min-height: 0 !important;
             margin: 0 !important;
             padding: 0 !important;
-            overflow-x: hidden !important;
-            overflow-y: visible !important;
             background: ${palette.bg} !important;
             background-color: ${palette.bg} !important;
             color: ${palette.fg} !important;
             color-scheme: ${theme==='night'?'dark':'light'} !important;
-            column-count: 1 !important;
-            column-width: auto !important;
-            column-gap: 0 !important;
           }
           body {
-            padding: 12px 14px 28px !important;
-            font-size: 100%;
-            line-height: 1.65 !important;
+            padding: 8px 10px !important;
+            font-size: 100% !important;
+            line-height: 1.55 !important;
             overflow-wrap: anywhere !important;
             word-wrap: break-word !important;
             hyphens: auto;
