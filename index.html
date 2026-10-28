@@ -294,6 +294,8 @@ async function openBook(book) {
     $('progress').textContent='Error de carga';
   }
 }
+
+// ⚓ RESTAURACIÓN INTELIGENTE DE EPUB (Anclaje Manual Prioritario sobre Progreso Automático)
 async function loadEpub(url,token) {
   if(typeof ePub!=='function') throw new Error('La biblioteca EPUB no se ha cargado.');
   if(typeof window.JSZip==='undefined' && typeof JSZip==='undefined') throw new Error('No se ha cargado JSZip.');
@@ -343,7 +345,7 @@ async function loadEpub(url,token) {
 
   const bookKey=getBookId(state.currentBook);
   
-  // 📖 RESTAURACIÓN INTELIGENTE EPUB: Priorizar Anclaje manual, si no existe usar Progreso automático
+  // Lógica de Prioridad: 1. Anclaje Manual | 2. Progreso Automático
   let targetLocation = undefined;
   const anchorRaw = localStorage.getItem(ANCHOR_PREFIX + bookKey);
   if (anchorRaw) {
@@ -363,7 +365,7 @@ async function loadEpub(url,token) {
 
   await state.book.ready;
   if(token!==state.loadToken)return;
-  await state.rendition.display(targetLocation);
+  await state.rendition.display(targetLocation || undefined);
   applyEpubTheme();
   state.book.locations.generate(1000).then(()=>{
     if(token!==state.loadToken)return;
@@ -374,6 +376,8 @@ async function loadEpub(url,token) {
   }).catch(e=>console.warn('No se pudieron generar ubicaciones',e));
   await restoreEpubHighlights();
 }
+
+// 📄 RESTAURACIÓN INTELIGENTE DE PDF (Anclaje Manual Prioritario sobre Progreso Automático)
 async function loadPdf(url,token) {
   if(!window.pdfjsLib) throw new Error('PDF.js no se ha cargado.');
   pdfjsLib.GlobalWorkerOptions.workerSrc='https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.16.105/pdf.worker.min.js';
@@ -399,13 +403,13 @@ async function loadPdf(url,token) {
   
   const bookKey = getBookId(state.currentBook);
   
-  // 📄 ANCLAJE Y RESTAURACIÓN PDF: Priorizar anclaje manual sobre el progreso
+  // Lógica de Prioridad: 1. Anclaje Manual | 2. Progreso Automático
   let targetPage = 1;
   const anchorRaw = localStorage.getItem(ANCHOR_PREFIX + bookKey);
   if (anchorRaw) {
     try {
       const anchor = JSON.parse(anchorRaw);
-      if (anchor?.format === 'pdf' && Number.isFinite(anchor.page)) {
+      if (anchor?.format === 'pdf' && Number.isFinite(Number(anchor.page))) {
         targetPage = Number(anchor.page);
       }
     } catch (_) {}
@@ -420,6 +424,7 @@ async function loadPdf(url,token) {
   state.page = Math.max(1, Math.min(state.pdf.numPages, targetPage));
   await renderPdfPage(state.page, token);
 }
+
 async function renderPdfPage(num,token=state.loadToken) {
   if(!state.pdf)return;
   num=Math.max(1,Math.min(state.pdf.numPages,Math.floor(num)));
@@ -725,6 +730,8 @@ async function applyReaderZoom(){
     container.scrollTop=oldScrollTop;
   }
 }
+
+// ⚓ GUARDADO DEL ANCLAJE MANUAL (Actualizado para guardar formato correcto)
 $('anchorPosition').addEventListener('click',()=>{
   if(!state.currentBook){status('Abre un libro antes de anclar la posición.');return;}
   const key=ANCHOR_PREFIX+getBookId(state.currentBook);
@@ -746,6 +753,7 @@ $('anchorPosition').addEventListener('click',()=>{
     setTimeout(()=>{if(btn)btn.textContent='⚓ Anclar';},2200);
   }catch(e){status('No se pudo guardar el anclaje en este dispositivo.');}
 });
+
 $('zoomIn').addEventListener('click',async()=>{
   state.scale=Math.min(3,Math.round((state.scale+.2)*10)/10);
   $('zoomLabel').textContent=`${Math.round(state.scale*100)}%`;
