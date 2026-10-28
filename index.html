@@ -27,8 +27,9 @@ main{flex:1;min-height:0;position:relative}.section{display:none;height:100%;ove
 .reader-tools{padding:8px;display:flex;gap:6px;align-items:center;flex-wrap:wrap;background:var(--card);border-bottom:1px solid var(--line)}.reader-tools select{max-width:130px}
 #readerTitle{font-size:13px;max-width:40vw;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 #viewerContainer{position:relative;flex:1;min-height:0;overflow:auto;background:var(--bg);overscroll-behavior:contain}
-#viewer{min-height:100%;width:100%;display:flex;justify-content:center;align-items:flex-start}
-#viewer .epub-container{width:100%!important}
+#viewer{height:100%;min-height:100%;width:100%;display:flex;justify-content:center;align-items:stretch;overflow:hidden}
+#viewer .epub-container{width:100%!important;height:100%!important;min-height:100%!important}
+#viewer iframe{display:block!important;width:100%!important;height:100%!important;border:0!important;background:var(--bg)!important}
 .pdf-page{position:relative;margin:0 auto;background:white;box-shadow:0 3px 12px #0002;line-height:0;flex-shrink:0;overflow:hidden}
 .pdf-page canvas{display:block;max-width:none}
 :root[data-theme="night"] .pdf-page canvas{filter:invert(.9) hue-rotate(180deg)}
@@ -300,7 +301,10 @@ async function loadEpub(url,token) {
   }
   if(token!==state.loadToken)return;
   state.book=ePub(bytes);
-  state.rendition=state.book.renderTo('viewer',{width:'100%',height:'100%',flow:'paginated',spread:'none',allowScriptedContent:false});
+  const viewerBox=$('viewerContainer');
+  const epubWidth=Math.max(280,viewerBox.clientWidth||window.innerWidth);
+  const epubHeight=Math.max(300,viewerBox.clientHeight||window.innerHeight*0.65);
+  state.rendition=state.book.renderTo('viewer',{width:epubWidth,height:epubHeight,flow:'paginated',spread:'none',allowScriptedContent:false});
   state.rendition.on('selected',(cfi,contents)=>{
     const text=contents?.window?.getSelection?.().toString().trim() || '';
     if(!text)return;
