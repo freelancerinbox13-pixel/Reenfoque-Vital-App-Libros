@@ -26,11 +26,11 @@ main{flex:1;min-height:0;position:relative}.section{display:none;height:100%;ove
 #readerSection{padding:0;display:none;flex-direction:column;overflow:hidden}#readerSection.active{display:flex}
 .reader-tools{padding:8px;display:flex;gap:6px;align-items:center;flex-wrap:wrap;background:var(--card);border-bottom:1px solid var(--line)}.reader-tools select{max-width:130px}
 #readerTitle{font-size:13px;max-width:40vw;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-#viewerContainer{position:relative;flex:1;min-height:0;overflow:auto;background:var(--bg);overscroll-behavior:contain}
-#viewer{height:auto;min-height:100%;width:100%;max-width:100%;min-width:0;display:block;overflow:visible}
+#viewerContainer{position:relative;flex:1;min-height:0;overflow:hidden;background:var(--bg);overscroll-behavior:contain}
+#viewer{height:100%;min-height:0;width:100%;max-width:100%;min-width:0;display:block;overflow:hidden}
 /* EPUB en lectura fluida: el contenido se desplaza verticalmente y se ajusta al móvil */
-#viewer .epub-container{width:100%!important;max-width:100%!important;height:auto!important;min-height:100%!important;margin:0!important;overflow:visible!important}
-#viewer .epub-view{width:100%!important;max-width:100%!important;overflow:visible!important}
+#viewer .epub-container{width:100%!important;max-width:100%!important;height:100%!important;min-height:0!important;margin:0!important;overflow:hidden!important}
+#viewer .epub-view{width:100%!important;max-width:100%!important;overflow:hidden!important}
 #viewer iframe{display:block!important;width:100%!important;max-width:100%!important;border:0!important;background:var(--bg)!important}
 .pdf-page{position:relative;margin:0 auto;background:white;box-shadow:0 3px 12px #0002;line-height:0;flex-shrink:0;overflow:hidden}
 .pdf-page canvas{display:block;max-width:none}
@@ -334,7 +334,7 @@ async function loadEpub(url,token) {
   const viewerBox=$('viewerContainer');
   const epubWidth=Math.max(1,viewerBox.clientWidth||window.innerWidth);
   const epubHeight=Math.max(1,viewerBox.clientHeight||window.innerHeight*0.65);
-  state.rendition=state.book.renderTo('viewer',{width:epubWidth,height:epubHeight,flow:'scrolled-doc',manager:'continuous',spread:'none',allowScriptedContent:false});
+  state.rendition=state.book.renderTo('viewer',{width:epubWidth,height:epubHeight,flow:'paginated',manager:'default',spread:'none',allowScriptedContent:false});
   state.rendition.on('selected',(cfi,contents)=>{
     const text=contents?.window?.getSelection?.().toString().trim() || '';
     if(!text)return;
