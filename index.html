@@ -28,7 +28,6 @@ main{flex:1;min-height:0;position:relative}.section{display:none;height:100%;ove
 #readerTitle{font-size:13px;max-width:40vw;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 #viewerContainer{position:relative;flex:1;min-height:0;overflow-x:hidden;overflow-y:auto;background:var(--bg);overscroll-behavior:contain;-webkit-overflow-scrolling:touch}
 #viewer{height:auto;min-height:100%;width:100%;max-width:100%;min-width:0;display:block;overflow:visible}
-/* EPUB en lectura fluida: el contenido se desplaza verticalmente y se ajusta al móvil */
 #viewer .epub-container{width:100%!important;max-width:100%!important;height:auto!important;min-height:100%!important;margin:0!important;overflow:visible!important}
 #viewer .epub-view{width:100%!important;max-width:100%!important;overflow:visible!important}
 #viewer iframe{display:block!important;width:100%!important;max-width:100%!important;border:0!important;background:var(--bg)!important}
@@ -107,9 +106,7 @@ try { tg?.ready(); tg?.expand(); } catch (_) {}
 
 const CONFIG = {
   supabaseUrl: 'https://augjyfnnzserfdoekkrp.supabase.co',
-  // La clave publishable/anon puede estar en el cliente, pero NUNCA pongas aquí una service_role key.
   supabaseAnonKey: 'sb_publishable_ed7WzU7SyteyxrAk5qE44w_N2vslpMU',
-  // Despliega la Edge Function incluida en este paquete y coloca su URL aquí.
   translateEndpoint: ''
 };
 const $ = id => document.getElementById(id);
@@ -192,7 +189,6 @@ function applyEpubTheme() {
 
   if(state.rendition) {
     try {
-      // Definir el tema de epub.js y forzarlo también dentro de cada iframe.
       state.rendition.themes.default({
         'html': {'background': `${palette.bg} !important`, 'color': `${palette.fg} !important`},
         'body': {'background': `${palette.bg} !important`, 'color': `${palette.fg} !important`},
@@ -212,8 +208,6 @@ function applyEpubTheme() {
         }
         style.textContent=`
           *, *::before, *::after { box-sizing: border-box !important; }
-          /* No anular la altura ni las columnas que calcula epub.js: eso hacía
-             que la página del libro fuese más ancha/alta que el visor móvil. */
           html, body {
             width: 100% !important;
             max-width: 100% !important;
@@ -227,7 +221,6 @@ function applyEpubTheme() {
           }
           body {
             padding: 8px 10px !important;
-            /* No fijar font-size aquí: epub.js controla el zoom del EPUB. */
             line-height: 1.55 !important;
             overflow-wrap: anywhere !important;
             word-wrap: break-word !important;
@@ -259,7 +252,6 @@ function applyEpubTheme() {
     } catch(e) { console.warn('No se pudieron aplicar los estilos al EPUB',e); }
   }
 
-  // El PDF se dibuja en un canvas; el filtro cambia la apariencia de la hoja.
   document.querySelectorAll('.pdf-page canvas').forEach(canvas=>{
     canvas.style.filter=theme==='night'
       ? 'invert(.9) hue-rotate(180deg)'
@@ -288,7 +280,7 @@ async function openBook(book) {
   const url=safeUrl(book.url_archivo);
   const format=fileFormat(book);
   if(!url){alert('Este libro no tiene una URL válida.');return;}
-  if(!format){alert('No puedo identificar el formato del libro. En Supabase, revisa que la columna formato contenga pdf o epub. La URL también debe apuntar al archivo correcto.');return;}
+  if(!format){alert('No puedo identificar el formato del libro. En Supabase, revisa que la columna formato contenga pdf o epub.');return;}
   await closeCurrentDocument();
   const token=state.loadToken; state.currentBook=book; state.format=format; state.scale=1;
   $('zoomLabel').textContent='100%'; showReader(book); $('viewer').replaceChildren();
@@ -303,34 +295,29 @@ async function openBook(book) {
   }
 }
 async function loadEpub(url,token) {
-  if(typeof ePub!=='function') throw new Error('La biblioteca EPUB no se ha cargado. Comprueba la conexión y recarga la aplicación.');
-  if(typeof window.JSZip==='undefined' && typeof JSZip==='undefined') throw new Error('No se ha cargado JSZip. Recarga la app; si continúa, revisa que la CDN jsdelivr.net o cdnjs.cloudflare.com no esté bloqueada.');
-  // Descargar el EPUB como bytes evita algunos fallos del cargador interno de epub.js
-  // con URLs de almacenamiento. El servidor debe permitir CORS desde el dominio Vercel.
+  if(typeof ePub!=='function') throw new Error('La biblioteca EPUB no se ha cargado.');
+  if(typeof window.JSZip==='undefined' && typeof JSZip==='undefined') throw new Error('No se ha cargado JSZip.');
   let response;
   try { response=await fetch(url,{method:'GET',mode:'cors',credentials:'omit',cache:'no-store'}); }
-  catch(err) { throw new Error(`No se pudo descargar el EPUB: ${err.message||'error de red'}. Revisa que la URL sea pública y que Supabase permita CORS desde Vercel.`); }
-  if(!response.ok) throw new Error(`Supabase respondió HTTP ${response.status} al descargar el EPUB. Revisa url_archivo y los permisos del bucket.`);
+  catch(err) { throw new Error(`No se pudo descargar el EPUB: ${err.message||'error de red'}.`); }
+  if(!response.ok) throw new Error(`Supabase respondió HTTP ${response.status} al descargar el EPUB.`);
   const bytes=await response.arrayBuffer();
   if(token!==state.loadToken)return;
   if(bytes.byteLength<4) throw new Error('El archivo EPUB está vacío o incompleto.');
-  // Los EPUB son archivos ZIP y normalmente empiezan con PK.
   const sig=new Uint8Array(bytes.slice(0,2));
-  if(sig[0]!==0x50 || sig[1]!==0x4b) throw new Error('El archivo descargado no parece ser un EPUB válido (ZIP). Revisa que url_archivo apunte al .epub y no a una página web.');
-  // Valida que el archivo sea un ZIP EPUB real antes de pasarlo a epub.js.
+  if(sig[0]!==0x50 || sig[1]!==0x4b) throw new Error('El archivo descargado no parece ser un EPUB válido (ZIP).');
   try {
     const zipCheck = await JSZip.loadAsync(bytes.slice(0));
     if (!zipCheck.file('META-INF/container.xml')) throw new Error('Falta META-INF/container.xml.');
   } catch (zipError) {
-    throw new Error(`El archivo descargado no es un EPUB válido o está dañado: ${zipError.message || 'no se pudo leer el ZIP'}`);
+    throw new Error(`El archivo descargado no es un EPUB válido o está dañado: ${zipError.message}`);
   }
   if(token!==state.loadToken)return;
   state.book=ePub(bytes);
   const viewerBox=$('viewerContainer');
   const epubWidth=Math.max(1,viewerBox.clientWidth||window.innerWidth);
   const epubHeight=Math.max(1,viewerBox.clientHeight||window.innerHeight*0.65);
-  // Modo vertical continuo: el usuario desplaza el contenido hacia abajo,
-  // sin páginas horizontales ni columnas de paginación.
+  
   state.rendition=state.book.renderTo('viewer',{width:epubWidth,height:epubHeight,flow:'scrolled-doc',manager:'continuous',spread:'none',allowScriptedContent:false});
   state.rendition.on('selected',(cfi,contents)=>{
     const text=contents?.window?.getSelection?.().toString().trim() || '';
@@ -353,15 +340,30 @@ async function loadEpub(url,token) {
       if(Number.isFinite(pct))$('progress').textContent=`${Math.round(pct*100)}%`;
     } else $('progress').textContent='Leyendo EPUB…';
   });
+
   const bookKey=getBookId(state.currentBook);
-  const anchorRaw=localStorage.getItem(ANCHOR_PREFIX+bookKey);
-  let saved=localStorage.getItem(PROGRESS_PREFIX+bookKey);
-  if(anchorRaw){
-    try{const anchor=JSON.parse(anchorRaw);if(anchor?.format==='epub'&&anchor.cfi)saved=anchor.cfi;}catch(_){}
+  
+  // 📖 RESTAURACIÓN INTELIGENTE EPUB: Priorizar Anclaje manual, si no existe usar Progreso automático
+  let targetLocation = undefined;
+  const anchorRaw = localStorage.getItem(ANCHOR_PREFIX + bookKey);
+  if (anchorRaw) {
+    try {
+      const anchor = JSON.parse(anchorRaw);
+      if (anchor?.format === 'epub' && anchor.cfi) {
+        targetLocation = anchor.cfi;
+      }
+    } catch (_) {}
   }
+  if (!targetLocation) {
+    const savedProgress = localStorage.getItem(PROGRESS_PREFIX + bookKey);
+    if (savedProgress) {
+      targetLocation = savedProgress;
+    }
+  }
+
   await state.book.ready;
   if(token!==state.loadToken)return;
-  await state.rendition.display(saved || undefined);
+  await state.rendition.display(targetLocation);
   applyEpubTheme();
   state.book.locations.generate(1000).then(()=>{
     if(token!==state.loadToken)return;
@@ -373,33 +375,50 @@ async function loadEpub(url,token) {
   await restoreEpubHighlights();
 }
 async function loadPdf(url,token) {
-  if(!window.pdfjsLib) throw new Error('PDF.js no se ha cargado. Comprueba tu conexión y vuelve a desplegar.');
+  if(!window.pdfjsLib) throw new Error('PDF.js no se ha cargado.');
   pdfjsLib.GlobalWorkerOptions.workerSrc='https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.16.105/pdf.worker.min.js';
   let firstError;
   try {
     state.pdf=await pdfjsLib.getDocument({url,withCredentials:false}).promise;
   } catch(err) {
     firstError=err;
-    // Segundo intento: descargar los bytes y entregárselos a PDF.js.
-    // Requiere que el objeto exista y que Supabase permita CORS para el dominio de la app.
     try {
       const response=await fetch(url,{method:'GET',mode:'cors',credentials:'omit',cache:'no-store'});
-      if(!response.ok) throw new Error(`Supabase respondió HTTP ${response.status} (${response.statusText}).`);
+      if(!response.ok) throw new Error(`Supabase respondió HTTP ${response.status}.`);
       const bytes=await response.arrayBuffer();
-      if(bytes.byteLength<5) throw new Error('El archivo descargado está vacío o incompleto.');
+      if(bytes.byteLength<5) throw new Error('El archivo descargado está vacío.');
       const signature=new TextDecoder('ascii').decode(bytes.slice(0,5));
-      if(signature!=='%PDF-') throw new Error('El archivo de Supabase no parece ser un PDF válido. Revisa la URL y el archivo guardado.');
+      if(signature!=='%PDF-') throw new Error('El archivo no es un PDF válido.');
       state.pdf=await pdfjsLib.getDocument({data:new Uint8Array(bytes)}).promise;
     } catch(secondError) {
-      const detail=secondError?.message || firstError?.message || 'error desconocido';
-      throw new Error(`No se pudo cargar el PDF. ${detail} Si aparece un error CORS, revisa los permisos del bucket Libros-bucket en Supabase. Si la URL da 404, corrige url_archivo. (PDF.js: ${firstError?.message || 'sin detalle'})`);
+      throw new Error(`No se pudo cargar el PDF: ${secondError?.message || firstError?.message}`);
     }
   }
   if(token!==state.loadToken)return;
   if(!state.pdf || !state.pdf.numPages) throw new Error('El archivo no contiene páginas PDF legibles.');
-  const saved=Number(localStorage.getItem(PROGRESS_PREFIX+getBookId(state.currentBook))||1);
-  state.page=Math.max(1,Math.min(state.pdf.numPages,Number.isFinite(saved)?saved:1));
-  await renderPdfPage(state.page,token);
+  
+  const bookKey = getBookId(state.currentBook);
+  
+  // 📄 ANCLAJE Y RESTAURACIÓN PDF: Priorizar anclaje manual sobre el progreso
+  let targetPage = 1;
+  const anchorRaw = localStorage.getItem(ANCHOR_PREFIX + bookKey);
+  if (anchorRaw) {
+    try {
+      const anchor = JSON.parse(anchorRaw);
+      if (anchor?.format === 'pdf' && Number.isFinite(anchor.page)) {
+        targetPage = Number(anchor.page);
+      }
+    } catch (_) {}
+  }
+  if (targetPage === 1) {
+    const savedProgress = Number(localStorage.getItem(PROGRESS_PREFIX + bookKey));
+    if (Number.isFinite(savedProgress) && savedProgress > 0) {
+      targetPage = savedProgress;
+    }
+  }
+
+  state.page = Math.max(1, Math.min(state.pdf.numPages, targetPage));
+  await renderPdfPage(state.page, token);
 }
 async function renderPdfPage(num,token=state.loadToken) {
   if(!state.pdf)return;
@@ -453,7 +472,6 @@ async function renderPdfPage(num,token=state.loadToken) {
   applyReaderThemeIfAvailable();
 }
 function applyReaderThemeIfAvailable(){
-  // Esta función solo refresca los resaltados PDF; el tema EPUB no se modifica.
   if(state.format==='pdf')restorePdfHighlights(state.page);
 }
 function restorePdfHighlights(pageNumber=state.page){
@@ -519,7 +537,6 @@ function applyMenuPosition(x,y,persist=false) {
 function showSelectionMenu(x,y) {
   const menu=$('selectionMenu');
   menu.style.display='flex';
-  // Restore the user's preferred position; otherwise place the menu near the selection.
   let saved=null;
   try{saved=JSON.parse(localStorage.getItem(MENU_POSITION_KEY)||'null');}catch(_){}
   requestAnimationFrame(()=>{
@@ -622,11 +639,11 @@ $('highlightSelection').addEventListener('click', () => {
   const anchor=state.selectedAnchor?JSON.parse(JSON.stringify(state.selectedAnchor)):{kind:state.format};
   const color=safeHighlightColor($('highlightColor')?.value);
   if(state.format==='epub'){
-    if(!anchor.cfi){alert('No se pudo localizar el fragmento seleccionado en el EPUB. Vuelve a seleccionar el texto y pulsa Resaltar.');return;}
-    if(!applyEpubHighlight(anchor.cfi,color)){alert('No se pudo marcar el texto en esta página EPUB. Prueba seleccionando el texto de nuevo.');return;}
+    if(!anchor.cfi){alert('No se pudo localizar el fragmento seleccionado en el EPUB.');return;}
+    if(!applyEpubHighlight(anchor.cfi,color)){alert('No se pudo marcar el texto en esta página EPUB.');return;}
   }else if(state.format==='pdf'){
-    if(anchor.kind!=='pdf'||!Array.isArray(anchor.rects)||!anchor.rects.length){alert('No se pudieron obtener las coordenadas del texto. Mantén pulsado, ajusta la selección y vuelve a intentarlo.');return;}
-    if(Number(anchor.page)!==Number(state.page)){alert('La página cambió. Selecciona el texto otra vez.');return;}
+    if(anchor.kind!=='pdf'||!Array.isArray(anchor.rects)||!anchor.rects.length){alert('No se pudieron obtener las coordenadas del texto.');return;}
+    if(Number(anchor.page)!==Number(state.page)){alert('La página cambió.');return;}
   }
   createNote({type:'Resaltado',text:state.selectedText,anchor,color});
   if(state.format==='pdf')restorePdfHighlights(state.page);
@@ -642,7 +659,7 @@ $('translateSelection').addEventListener('click',async()=>{
   const original=state.selectedText;
   if(!original){alert('Selecciona primero un fragmento de texto.');return;}
   hideSelectionMenu();
-  if(!CONFIG.translateEndpoint){status('La traducción real aún no está configurada. Despliega la Edge Function, configura el proveedor y añade su URL en CONFIG.translateEndpoint.');return;}
+  if(!CONFIG.translateEndpoint){status('La traducción real aún no está configurada.');return;}
   try{
     status('Traduciendo…');
     const res=await fetch(CONFIG.translateEndpoint,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({text:original,source:'auto',target:'es'})});
@@ -676,7 +693,6 @@ async function applyReaderZoom(){
   if(!state.rendition)return;
   const rendition=state.rendition;
   const container=$('viewerContainer');
-  // Keep the visible reading position anchored while the text reflows.
   let anchorCfi='';
   try{
     const loc=rendition.currentLocation();
@@ -691,10 +707,8 @@ async function applyReaderZoom(){
     rendition.themes.override('font-size',size,true);
     rendition.themes.fontSize(size);
     applyEpubTheme();
-    // Re-display the current CFI so the same passage remains in view after reflow.
     if(anchorCfi) await rendition.display(anchorCfi);
     requestAnimationFrame(()=>requestAnimationFrame(()=>{
-      // Fallback for EPUBs that do not honour the CFI anchor consistently.
       if(!anchorCfi)container.scrollTop=oldScrollTop;
       const loc=rendition.currentLocation();
       const cfi=loc?.start?.cfi || anchorCfi;
@@ -718,7 +732,7 @@ $('anchorPosition').addEventListener('click',()=>{
     if(state.format==='epub'&&state.rendition){
       const loc=state.rendition.currentLocation();
       const cfi=loc?.start?.cfi;
-      if(!cfi){status('No se pudo detectar la posición actual. Desplázate un poco y vuelve a intentarlo.');return;}
+      if(!cfi){status('No se pudo detectar la posición actual.');return;}
       localStorage.setItem(key,JSON.stringify({format:'epub',cfi}));
       localStorage.setItem(PROGRESS_PREFIX+getBookId(state.currentBook),cfi);
     }else if(state.format==='pdf'){
@@ -728,7 +742,7 @@ $('anchorPosition').addEventListener('click',()=>{
     }
     const btn=$('anchorPosition');
     btn.textContent='⚓ Anclado';
-    status('Posición anclada. Al volver a abrir este libro, intentaremos regresar a este lugar.');
+    status('Posición anclada correctamente.');
     setTimeout(()=>{if(btn)btn.textContent='⚓ Anclar';},2200);
   }catch(e){status('No se pudo guardar el anclaje en este dispositivo.');}
 });
@@ -782,7 +796,7 @@ window.addEventListener('resize',()=>{
       const box=$('viewerContainer');
       const width=Math.max(1,box.clientWidth);
       const height=Math.max(1,box.clientHeight);
-      try{state.rendition.resize(width,height);applyEpubTheme();}catch(e){console.warn('No se pudo reajustar el EPUB al tamaño de la app',e);}
+      try{state.rendition.resize(width,height);applyEpubTheme();}catch(e){console.warn('No se pudo reajustar el EPUB',e);}
     }
   },180);
 });
