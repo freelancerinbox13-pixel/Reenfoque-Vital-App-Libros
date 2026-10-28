@@ -27,9 +27,11 @@ main{flex:1;min-height:0;position:relative}.section{display:none;height:100%;ove
 .reader-tools{padding:8px;display:flex;gap:6px;align-items:center;flex-wrap:wrap;background:var(--card);border-bottom:1px solid var(--line)}.reader-tools select{max-width:130px}
 #readerTitle{font-size:13px;max-width:40vw;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 #viewerContainer{position:relative;flex:1;min-height:0;overflow:auto;background:var(--bg);overscroll-behavior:contain}
-#viewer{height:100%;min-height:100%;width:100%;max-width:100%;min-width:0;display:flex;justify-content:center;align-items:stretch;overflow:hidden}
-#viewer .epub-container{width:100%!important;max-width:100%!important;height:100%!important;min-height:100%!important;margin:0 auto!important}
-#viewer iframe{display:block!important;max-width:100%!important;height:100%!important;border:0!important;background:var(--bg)!important}
+#viewer{height:auto;min-height:100%;width:100%;max-width:100%;min-width:0;display:block;overflow:visible}
+/* EPUB en lectura fluida: el contenido se desplaza verticalmente y se ajusta al móvil */
+#viewer .epub-container{width:100%!important;max-width:100%!important;height:auto!important;min-height:100%!important;margin:0!important;overflow:visible!important}
+#viewer .epub-view{width:100%!important;max-width:100%!important;overflow:visible!important}
+#viewer iframe{display:block!important;width:100%!important;max-width:100%!important;border:0!important;background:var(--bg)!important}
 .pdf-page{position:relative;margin:0 auto;background:white;box-shadow:0 3px 12px #0002;line-height:0;flex-shrink:0;overflow:hidden}
 .pdf-page canvas{display:block;max-width:none}
 :root[data-theme="night"] .pdf-page canvas{filter:invert(.9) hue-rotate(180deg)}
@@ -208,35 +210,45 @@ function applyEpubTheme() {
           (doc.head || doc.documentElement).appendChild(style);
         }
         style.textContent=`
+          *, *::before, *::after { box-sizing: border-box !important; }
           html, body {
+            display: block !important;
             width: 100% !important;
             max-width: 100% !important;
             min-width: 0 !important;
+            height: auto !important;
+            min-height: 0 !important;
             margin: 0 !important;
             padding: 0 !important;
-            box-sizing: border-box !important;
             overflow-x: hidden !important;
+            overflow-y: visible !important;
             background: ${palette.bg} !important;
             background-color: ${palette.bg} !important;
             color: ${palette.fg} !important;
             color-scheme: ${theme==='night'?'dark':'light'} !important;
+            column-count: 1 !important;
+            column-width: auto !important;
+            column-gap: 0 !important;
           }
           body {
-            padding: 0 4% !important;
-            overflow-wrap: break-word !important;
+            padding: 12px 14px 28px !important;
+            font-size: 100%;
+            line-height: 1.65 !important;
+            overflow-wrap: anywhere !important;
             word-wrap: break-word !important;
+            hyphens: auto;
           }
           body, body *:not(img):not(svg):not(path):not(canvas) {
             color: ${palette.fg} !important;
-            box-sizing: border-box !important;
           }
-          img, svg, video, canvas, table, pre, iframe {
+          p, div, section, article, blockquote, li, h1, h2, h3, h4, h5, h6 {
             max-width: 100% !important;
+            overflow-wrap: break-word !important;
           }
-          img, video, canvas { height: auto; }
-          table { table-layout: auto !important; }
+          img, svg, video, canvas, table, pre, iframe { max-width: 100% !important; }
+          img, video, canvas, svg { height: auto !important; }
+          table { width: auto !important; max-width: 100% !important; table-layout: auto !important; }
           pre, code { white-space: pre-wrap !important; overflow-wrap: anywhere !important; }
-          p, div, section, article, blockquote, li { max-width: 100% !important; }
           a, a * { color: ${palette.link} !important; }
         `;
         doc.documentElement.style.setProperty('background',palette.bg,'important');
@@ -322,7 +334,7 @@ async function loadEpub(url,token) {
   const viewerBox=$('viewerContainer');
   const epubWidth=Math.max(1,viewerBox.clientWidth||window.innerWidth);
   const epubHeight=Math.max(1,viewerBox.clientHeight||window.innerHeight*0.65);
-  state.rendition=state.book.renderTo('viewer',{width:epubWidth,height:epubHeight,flow:'paginated',spread:'none',manager:'default',allowScriptedContent:false});
+  state.rendition=state.book.renderTo('viewer',{width:epubWidth,height:epubHeight,flow:'scrolled-doc',manager:'continuous',spread:'none',allowScriptedContent:false});
   state.rendition.on('selected',(cfi,contents)=>{
     const text=contents?.window?.getSelection?.().toString().trim() || '';
     if(!text)return;
@@ -660,6 +672,18 @@ $('nextPage').addEventListener('click',async()=>{
 });
 $('zoomIn').addEventListener('click',async()=>{state.scale=Math.min(3,Math.round((state.scale+.2)*10)/10);$('zoomLabel').textContent=`${Math.round(state.scale*100)}%`;if(state.format==='pdf')await renderPdfPage(state.page);else if(state.rendition)state.rendition.themes.fontSize(`${Math.round(state.scale*100)}%`);});
 $('zoomOut').addEventListener('click',async()=>{state.scale=Math.max(.6,Math.round((state.scale-.2)*10)/10);$('zoomLabel').textContent=`${Math.round(state.scale*100)}%`;if(state.format==='pdf')await renderPdfPage(state.page);else if(state.rendition)state.rendition.themes.fontSize(`${Math.round(state.scale*100)}%`);});
+let epubResizeTimer;
+window.addEventListener('resize',()=>{
+  if(!state.rendition || state.format!=='epub') return;
+  clearTimeout(epubResizeTimer);
+  epubResizeTimer=setTimeout(()=>{
+    try {
+      const box=$('viewerContainer');
+      state.rendition.resize(Math.max(1,box.clientWidth),Math.max(1,box.clientHeight));
+      applyEpubTheme();
+    } catch(e) { console.warn('No se pudo reajustar el EPUB al tamaño de pantalla',e); }
+  },180);
+});
 $('themeSelect').addEventListener('change',e=>setTheme(e.target.value));
 $('navLibrary').addEventListener('click',()=>setSection('librarySection'));
 $('navNotes').addEventListener('click',()=>setSection('notesSection'));
