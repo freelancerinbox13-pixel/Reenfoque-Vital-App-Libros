@@ -71,7 +71,7 @@ main{flex:1;min-height:0;position:relative}.section{display:none;height:100%;ove
 <div class="reader-tools">
 <button id="backLibrary" class="secondary">← Biblioteca</button><strong id="readerTitle">Lector</strong>
 <select id="themeSelect" aria-label="Tema"><option value="day">Día</option><option value="night">Noche</option><option value="ebook">E-book</option></select>
-<button id="zoomOut" class="secondary" aria-label="Reducir zoom">−</button><span id="zoomLabel" class="small">100%</span><button id="zoomIn" class="secondary" aria-label="Ampliar zoom">+</button>
+<button id="zoomOut" class="secondary" aria-label="Reducir zoom">−</button><span id="zoomLabel" class="small">100%</span><button id="zoomIn" class="secondary" aria-label="Ampliar zoom">+</button><button id="anchorPosition" class="secondary" aria-label="Anclar posición de lectura">⚓ Anclar</button>
 </div>
 <div id="viewerContainer"><div id="viewer"></div></div>
 <div class="reader-bottom"><button id="prevPage" class="secondary">Anterior</button><span id="progress" class="muted">Preparando…</span><button id="nextPage">Siguiente</button></div>
@@ -121,6 +121,7 @@ const state = {
 const NOTES_KEY = 'reader_pro_notes_v1';
 const THEME_KEY = 'reader_pro_theme';
 const PROGRESS_PREFIX = 'reader_pro_progress_';
+const ANCHOR_PREFIX = 'reader_pro_anchor_';
 const status = (message, show=true) => { $('status').textContent = message; $('status').style.display = show ? 'block' : 'none'; };
 function escapeText(value) { return String(value ?? ''); }
 function saveNotes() { try { localStorage.setItem(NOTES_KEY, JSON.stringify(state.notes)); } catch(e) { status('No se pudieron guardar las notas: almacenamiento lleno o bloqueado.'); } }
@@ -352,7 +353,12 @@ async function loadEpub(url,token) {
       if(Number.isFinite(pct))$('progress').textContent=`${Math.round(pct*100)}%`;
     } else $('progress').textContent='Leyendo EPUB…';
   });
-  const saved=localStorage.getItem(PROGRESS_PREFIX+getBookId(state.currentBook));
+  const bookKey=getBookId(state.currentBook);
+  const anchorRaw=localStorage.getItem(ANCHOR_PREFIX+bookKey);
+  let saved=localStorage.getItem(PROGRESS_PREFIX+bookKey);
+  if(anchorRaw){
+    try{const anchor=JSON.parse(anchorRaw);if(anchor?.format==='epub'&&anchor.cfi)saved=anchor.cfi;}catch(_){}
+  }
   await state.book.ready;
   if(token!==state.loadToken)return;
   await state.rendition.display(saved || undefined);
@@ -705,6 +711,27 @@ async function applyReaderZoom(){
     container.scrollTop=oldScrollTop;
   }
 }
+$('anchorPosition').addEventListener('click',()=>{
+  if(!state.currentBook){status('Abre un libro antes de anclar la posición.');return;}
+  const key=ANCHOR_PREFIX+getBookId(state.currentBook);
+  try{
+    if(state.format==='epub'&&state.rendition){
+      const loc=state.rendition.currentLocation();
+      const cfi=loc?.start?.cfi;
+      if(!cfi){status('No se pudo detectar la posición actual. Desplázate un poco y vuelve a intentarlo.');return;}
+      localStorage.setItem(key,JSON.stringify({format:'epub',cfi}));
+      localStorage.setItem(PROGRESS_PREFIX+getBookId(state.currentBook),cfi);
+    }else if(state.format==='pdf'){
+      localStorage.setItem(key,JSON.stringify({format:'pdf',page:state.page||1}));
+    }else{
+      status('Este anclaje está disponible al leer un PDF o EPUB.');return;
+    }
+    const btn=$('anchorPosition');
+    btn.textContent='⚓ Anclado';
+    status('Posición anclada. Al volver a abrir este libro, intentaremos regresar a este lugar.');
+    setTimeout(()=>{if(btn)btn.textContent='⚓ Anclar';},2200);
+  }catch(e){status('No se pudo guardar el anclaje en este dispositivo.');}
+});
 $('zoomIn').addEventListener('click',async()=>{
   state.scale=Math.min(3,Math.round((state.scale+.2)*10)/10);
   $('zoomLabel').textContent=`${Math.round(state.scale*100)}%`;
