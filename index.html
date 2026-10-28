@@ -664,8 +664,28 @@ $('nextPage').addEventListener('click',async()=>{
   if(state.format==='epub'&&state.rendition){await state.rendition.next();}
   else if(state.format==='pdf'&&state.pdf&&state.page<state.pdf.numPages)await renderPdfPage(state.page+1);
 });
-$('zoomIn').addEventListener('click',async()=>{state.scale=Math.min(3,Math.round((state.scale+.2)*10)/10);$('zoomLabel').textContent=`${Math.round(state.scale*100)}%`;if(state.format==='pdf')await renderPdfPage(state.page);else if(state.rendition){state.rendition.themes.fontSize(`${Math.round(state.scale*100)}%`);}});
-$('zoomOut').addEventListener('click',async()=>{state.scale=Math.max(.6,Math.round((state.scale-.2)*10)/10);$('zoomLabel').textContent=`${Math.round(state.scale*100)}%`;if(state.format==='pdf')await renderPdfPage(state.page);else if(state.rendition){state.rendition.themes.fontSize(`${Math.round(state.scale*100)}%`);}});
+function applyReaderZoom(){
+  if(!state.rendition)return;
+  const size=`${Math.round(state.scale*100)}%`;
+  try{
+    // Override publisher-defined font sizes too, not just the inherited body size.
+    state.rendition.themes.override('font-size',size,true);
+    state.rendition.themes.fontSize(size);
+    applyEpubTheme();
+  }catch(e){console.warn('No se pudo aplicar el zoom EPUB',e);}
+}
+$('zoomIn').addEventListener('click',async()=>{
+  state.scale=Math.min(3,Math.round((state.scale+.2)*10)/10);
+  $('zoomLabel').textContent=`${Math.round(state.scale*100)}%`;
+  if(state.format==='pdf')await renderPdfPage(state.page);
+  else if(state.rendition)applyReaderZoom();
+});
+$('zoomOut').addEventListener('click',async()=>{
+  state.scale=Math.max(.4,Math.round((state.scale-.2)*10)/10);
+  $('zoomLabel').textContent=`${Math.round(state.scale*100)}%`;
+  if(state.format==='pdf')await renderPdfPage(state.page);
+  else if(state.rendition)applyReaderZoom();
+});
 $('themeSelect').addEventListener('change',e=>setTheme(e.target.value));
 $('navLibrary').addEventListener('click',()=>setSection('librarySection'));
 $('navNotes').addEventListener('click',()=>setSection('notesSection'));
