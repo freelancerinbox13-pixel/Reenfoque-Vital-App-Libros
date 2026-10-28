@@ -209,16 +209,34 @@ function applyEpubTheme() {
         }
         style.textContent=`
           html, body {
+            width: 100% !important;
+            max-width: 100% !important;
+            min-width: 0 !important;
+            margin: 0 !important;
+            padding: 0 !important;
+            box-sizing: border-box !important;
+            overflow-x: hidden !important;
             background: ${palette.bg} !important;
             background-color: ${palette.bg} !important;
             color: ${palette.fg} !important;
             color-scheme: ${theme==='night'?'dark':'light'} !important;
           }
+          body {
+            padding: 0 4% !important;
+            overflow-wrap: break-word !important;
+            word-wrap: break-word !important;
+          }
           body, body *:not(img):not(svg):not(path):not(canvas) {
             color: ${palette.fg} !important;
-            background-color: transparent !important;
+            box-sizing: border-box !important;
           }
-          html, body { background: ${palette.bg} !important; }
+          img, svg, video, canvas, table, pre, iframe {
+            max-width: 100% !important;
+          }
+          img, video, canvas { height: auto; }
+          table { table-layout: auto !important; }
+          pre, code { white-space: pre-wrap !important; overflow-wrap: anywhere !important; }
+          p, div, section, article, blockquote, li { max-width: 100% !important; }
           a, a * { color: ${palette.link} !important; }
         `;
         doc.documentElement.style.setProperty('background',palette.bg,'important');
@@ -302,9 +320,9 @@ async function loadEpub(url,token) {
   if(token!==state.loadToken)return;
   state.book=ePub(bytes);
   const viewerBox=$('viewerContainer');
-  const epubWidth=Math.max(280,viewerBox.clientWidth||window.innerWidth);
-  const epubHeight=Math.max(300,viewerBox.clientHeight||window.innerHeight*0.65);
-  state.rendition=state.book.renderTo('viewer',{width:epubWidth,height:epubHeight,flow:'paginated',spread:'none',allowScriptedContent:false});
+  const epubWidth=Math.max(1,viewerBox.clientWidth||window.innerWidth);
+  const epubHeight=Math.max(1,viewerBox.clientHeight||window.innerHeight*0.65);
+  state.rendition=state.book.renderTo('viewer',{width:epubWidth,height:epubHeight,flow:'paginated',spread:'none',manager:'default',allowScriptedContent:false});
   state.rendition.on('selected',(cfi,contents)=>{
     const text=contents?.window?.getSelection?.().toString().trim() || '';
     if(!text)return;
