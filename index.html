@@ -666,27 +666,56 @@ $('nextPage').addEventListener('click',async()=>{
   if(state.format==='epub'&&state.rendition){await state.rendition.next();}
   else if(state.format==='pdf'&&state.pdf&&state.page<state.pdf.numPages)await renderPdfPage(state.page+1);
 });
-function applyReaderZoom(){
+async function applyReaderZoom(){
   if(!state.rendition)return;
+  const rendition=state.rendition;
+  const container=$('viewerContainer');
+  // Keep the visible reading position anchored while the text reflows.
+  let anchorCfi='';
+  try{
+    const loc=rendition.currentLocation();
+    anchorCfi=loc?.start?.cfi || '';
+    if(anchorCfi && state.currentBook){
+      localStorage.setItem(PROGRESS_PREFIX+getBookId(state.currentBook),anchorCfi);
+    }
+  }catch(_){}
+  const oldScrollTop=container.scrollTop;
   const size=`${Math.round(state.scale*100)}%`;
   try{
-    // Override publisher-defined font sizes too, not just the inherited body size.
-    state.rendition.themes.override('font-size',size,true);
-    state.rendition.themes.fontSize(size);
+    rendition.themes.override('font-size',size,true);
+    rendition.themes.fontSize(size);
     applyEpubTheme();
-  }catch(e){console.warn('No se pudo aplicar el zoom EPUB',e);}
+    // Re-display the current CFI so the same passage remains in view after reflow.
+    if(anchorCfi) await rendition.display(anchorCfi);
+    requestAnimationFrame(()=>requestAnimationFrame(()=>{
+      // Fallback for EPUBs that do not honour the CFI anchor consistently.
+      if(!anchorCfi)container.scrollTop=oldScrollTop;
+      const loc=rendition.currentLocation();
+      const cfi=loc?.start?.cfi || anchorCfi;
+      if(cfi && state.currentBook){
+        try{localStorage.setItem(PROGRESS_PREFIX+getBookId(state.currentBook),cfi);}catch(_){}
+      }
+      if(state.locationsReady && cfi){
+        const pct=state.book.locations.percentageFromCfi(cfi);
+        if(Number.isFinite(pct))$('progress').textContent=`${Math.round(pct*100)}%`;
+      }
+    }));
+  }catch(e){
+    console.warn('No se pudo aplicar el zoom EPUB',e);
+    container.scrollTop=oldScrollTop;
+  }
 }
 $('zoomIn').addEventListener('click',async()=>{
   state.scale=Math.min(3,Math.round((state.scale+.2)*10)/10);
   $('zoomLabel').textContent=`${Math.round(state.scale*100)}%`;
   if(state.format==='pdf')await renderPdfPage(state.page);
-  else if(state.rendition)applyReaderZoom();
+  else if(state.rendition)await applyReaderZoom();
 });
 $('zoomOut').addEventListener('click',async()=>{
   state.scale=Math.max(.4,Math.round((state.scale-.2)*10)/10);
   $('zoomLabel').textContent=`${Math.round(state.scale*100)}%`;
   if(state.format==='pdf')await renderPdfPage(state.page);
-  else if(state.rendition)applyReaderZoom();
+  else if(state.rendition)await applyReaderZoom();
 });
 $('themeSelect').addEventListener('change',e=>setTheme(e.target.value));
 $('navLibrary').addEventListener('click',()=>setSection('librarySection'));
