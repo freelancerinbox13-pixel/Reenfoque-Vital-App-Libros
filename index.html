@@ -226,7 +226,7 @@ function applyEpubTheme() {
           }
           body {
             padding: 8px 10px !important;
-            font-size: 100% !important;
+            /* No fijar font-size aquí: epub.js controla el zoom del EPUB. */
             line-height: 1.55 !important;
             overflow-wrap: anywhere !important;
             word-wrap: break-word !important;
@@ -664,20 +664,8 @@ $('nextPage').addEventListener('click',async()=>{
   if(state.format==='epub'&&state.rendition){await state.rendition.next();}
   else if(state.format==='pdf'&&state.pdf&&state.page<state.pdf.numPages)await renderPdfPage(state.page+1);
 });
-$('zoomIn').addEventListener('click',async()=>{state.scale=Math.min(3,Math.round((state.scale+.2)*10)/10);$('zoomLabel').textContent=`${Math.round(state.scale*100)}%`;if(state.format==='pdf')await renderPdfPage(state.page);else if(state.rendition)state.rendition.themes.fontSize(`${Math.round(state.scale*100)}%`);});
-$('zoomOut').addEventListener('click',async()=>{state.scale=Math.max(.6,Math.round((state.scale-.2)*10)/10);$('zoomLabel').textContent=`${Math.round(state.scale*100)}%`;if(state.format==='pdf')await renderPdfPage(state.page);else if(state.rendition)state.rendition.themes.fontSize(`${Math.round(state.scale*100)}%`);});
-let epubResizeTimer;
-window.addEventListener('resize',()=>{
-  if(!state.rendition || state.format!=='epub') return;
-  clearTimeout(epubResizeTimer);
-  epubResizeTimer=setTimeout(()=>{
-    try {
-      const box=$('viewerContainer');
-      state.rendition.resize(Math.max(1,box.clientWidth),Math.max(1,box.clientHeight));
-      applyEpubTheme();
-    } catch(e) { console.warn('No se pudo reajustar el EPUB al tamaño de pantalla',e); }
-  },180);
-});
+$('zoomIn').addEventListener('click',async()=>{state.scale=Math.min(3,Math.round((state.scale+.2)*10)/10);$('zoomLabel').textContent=`${Math.round(state.scale*100)}%`;if(state.format==='pdf')await renderPdfPage(state.page);else if(state.rendition){state.rendition.themes.fontSize(`${Math.round(state.scale*100)}%`);}});
+$('zoomOut').addEventListener('click',async()=>{state.scale=Math.max(.6,Math.round((state.scale-.2)*10)/10);$('zoomLabel').textContent=`${Math.round(state.scale*100)}%`;if(state.format==='pdf')await renderPdfPage(state.page);else if(state.rendition){state.rendition.themes.fontSize(`${Math.round(state.scale*100)}%`);}});
 $('themeSelect').addEventListener('change',e=>setTheme(e.target.value));
 $('navLibrary').addEventListener('click',()=>setSection('librarySection'));
 $('navNotes').addEventListener('click',()=>setSection('notesSection'));
